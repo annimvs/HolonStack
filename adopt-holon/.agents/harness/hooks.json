@@ -2,6 +2,7 @@
   "events": {
     "pre-shell": ["hooks/guard-bash.swift", "hooks/rewrite-bash.swift", "hooks/guard-search.swift"],
     "pre-search": ["hooks/guard-search.swift"],
+    "pre-agent": ["hooks/guard-agent.swift"],
     "pre-edit": ["hooks/guard-edit.swift"],
     "post-shell": ["hooks/check-shell-edit.swift"],
     "post-edit": ["hooks/check-edit.swift", "hooks/route-semantics.swift"],

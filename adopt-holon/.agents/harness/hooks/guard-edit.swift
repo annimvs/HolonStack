@@ -93,11 +93,13 @@ func bindClaim(agent: String, name: String, claims: [String: [String: Any]]) -> 
     return nil
 }
 
-/// Takes the calling subagent's id; refuses (exit 2) an edit to project source outside that agent's claim. Does nothing when no claims exist.
-/// An empty file written to `claims/<name>.bind` binds the claim `<name>` to the agent. Paths under `.agents/` and outside the project are not claim business.
+/// Takes the calling subagent's id; refuses (exit 2) an edit to project source unless the subagent has bound a live
+/// claim covering that path (or `HOLON_ALLOW_UNCLAIMED_AGENT=1`).
+/// An empty file written to `claims/<name>.bind` binds the claim `<name>` to the agent. Paths under `.agents/` and
+/// outside the project are not claim business; the main orchestrator has no `agent_id` and is never restricted.
 func enforceClaim(agent: String) {
+    if environment["HOLON_ALLOW_UNCLAIMED_AGENT"] == "1" { return }
     let claims = liveClaims()
-    if claims.isEmpty { return }
     if path.hasPrefix(claimsDir + "/"), path.hasSuffix(".bind") {
         let name = String(path.dropFirst(claimsDir.count + 1).dropLast(5))
         if let problem = bindClaim(agent: agent, name: name, claims: claims) { blockEdit(problem) }
@@ -105,6 +107,11 @@ func enforceClaim(agent: String) {
     }
     guard path.hasPrefix(proj + "/"), !path.hasPrefix(proj + "/.agents/") else { return }
     let rel = String(path.dropFirst(proj.count + 1))
+    if claims.isEmpty {
+        blockEdit(
+            "guard-edit: subagent cannot edit \(rel) without an isolate claim; the orchestrator must file one with "
+                + "`.agents/harness/bin/isolate claim <name> <task>` before spawning (rules/DELEGATION.md)")
+    }
     guard let mine = claims.first(where: { $0.value["agent"] as? String == agent }) else {
         let names = claims.keys.sorted().joined(separator: " ")
         blockEdit(

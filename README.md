@@ -85,6 +85,7 @@ HolonStack/
             │   ├── check-drafts.swift # Stop / SubagentStop: blocks turn end while a draft fails its template
             │   ├── check-edit.swift   # PostToolUse: lints harness Swift, checks drafts/records, verifies wiring
             │   ├── check-shell-edit.swift # PostToolUse(Bash/run_command): runs check-edit & route-semantics after bin/edit
+            │   ├── guard-agent.swift  # PreToolUse(Agent/invoke_subagent): refuses spawning editing subagents without an unbound isolate claim
             │   ├── guard-bash.swift   # PreToolUse(Bash/run_command): blocks destructive git, unsafe rm, outside writes, shell edits
             │   ├── guard-edit.swift   # PreToolUse(Edit/Write): protects indexes/templates/criteria, enforces worker claims, steers to bin/edit
             │   ├── guard-search.swift # PreToolUse(Grep/Bash): steers project searches to bin/seek
