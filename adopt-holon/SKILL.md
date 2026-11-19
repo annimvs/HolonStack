@@ -37,8 +37,8 @@ Use this skill when running `/adopt-holon` in a repository to install the bundle
 1. **Detect the build system and language(s), and tailor the harness scripts:**
    - **Graph isolation (`.agents/harness/tools/isolate.swift`):**
      - **Single-target / simple repo** (one executable or library with no sub-targets): skip rewriting `isolate.swift`—parallel target isolation isn't needed.
-     - **SwiftPM, Cargo, and Node workspaces** (`Package.swift`, `Cargo.toml`, `package.json`): `isolate.swift` works out of the box.
-     - **CMake / Meson / Ninja / Go / Bazel / Gradle / Make** (`CMakeLists.txt`, `meson.build`, `build.ninja`, `go.mod`, `BUILD.bazel`, `build.gradle`, `Makefile`): add a graph loader to `loadGraph` in `isolate.swift` (e.g., `cmake --graphviz`, `meson introspect --targets`, `ninja -t graph`, `go list`, `bazel query`, or manifest parsing), keeping `Graph`, `Claim`, and the CLI unchanged. Follow `.agents/harness/rules/SWIFT.md` (`// MARK: - <Type>` + `///` doc comments, Swift 6 concurrency) so `bin/lint` passes on the first save.
+     - **SwiftPM, Cargo, Node/pnpm, Go, and CMake** (`Package.swift`, `Cargo.toml`, `package.json`/`pnpm-workspace.yaml`, `go.mod`, `CMakeLists.txt`): `isolate.swift` works out of the box.
+     - **Meson / Ninja / Bazel / Gradle / Make** (`meson.build`, `build.ninja`, `BUILD.bazel`, `build.gradle`, `Makefile`): add a graph loader to `loadGraph` in `isolate.swift` (e.g., `meson introspect --targets`, `ninja -t graph`, `bazel query`, or manifest parsing), keeping `Graph`, `Claim`, and the CLI unchanged. Follow `.agents/harness/rules/SWIFT.md` (`// MARK: - <Type>` + `///` doc comments, Swift 6 concurrency) so `bin/lint` passes on the first save.
    - **Build output filtering (`.agents/harness/hooks/rewrite-bash.swift` and `tools/filter-run.swift`):**
      - Extend `rewrite-bash.swift`'s `pattern` for the project's build and test commands (e.g. `cmake --build`, `ctest`, `meson compile`, `ninja`, `npm test`, `pnpm build`, `cargo build`, `cargo test`, `pytest`, `go test`).
      - Verify `filter-run.swift`'s `keep` / `drop` regexes match the project's compiler and test-runner diagnostics.

@@ -100,7 +100,7 @@ HolonStack/
             │   ├── check-docs.swift   # Verifies AGENTS banners, relative links, skill docs, and zero orphans
             │   ├── edit.swift         # Hash-checked, exact-match/line-range atomic file editor with unified diff
             │   ├── filter-run.swift   # Runs build/test commands, keeps full log, prints concise errors/totals
-            │   ├── isolate.swift      # Target dependency graph & parallel worker claim planner (SwiftPM, Cargo, Node/pnpm)
+            │   ├── isolate.swift      # Target dependency graph & parallel worker claim planner (SwiftPM, Cargo, Node/pnpm, Go, CMake)
             │   ├── lint.swift         # Swift 6 typecheck, swift-format, and lint.closure checker for harness scripts
             │   ├── perf-confirm.swift # Runs checks on open performance findings to confirm them
             │   ├── perf-report.swift  # Generates records/PERF.md scoreboard
@@ -120,7 +120,7 @@ HolonStack/
 |---|---|
 | **Agent clients** | Claude Code (`.claude/settings.json`, `.claude/skills/`) and Antigravity / Gemini (`.agents/hooks.json`) with full `bin/edit` and `bin/seek` enforcement parity |
 | **OS platforms** | macOS (`Darwin`) and Linux (`Glibc`) via Swift 6+ |
-| **Graph isolation (`isolate`)** | SwiftPM (`Package.swift`), Cargo (`Cargo.toml`), npm/yarn/bun (`package.json`), pnpm (`pnpm-workspace.yaml`); extensible for CMake, Meson, Ninja, Go, Bazel, Make during `/adopt-holon` |
+| **Graph isolation (`isolate`)** | SwiftPM (`Package.swift`), Cargo (`Cargo.toml`), npm/yarn/bun (`package.json`), pnpm (`pnpm-workspace.yaml`), Go (`go.mod`), CMake (`CMakeLists.txt`); extensible for Meson, Ninja, Bazel, Gradle, Make during `/adopt-holon` |
 | **Scope-aware search (`seek`)** | Swift, C/C++/ObjC, Rust, Go, JS/TS, Java, Kotlin, C#, Zig, Python, Markdown, `.closure` |
 
 ## License
