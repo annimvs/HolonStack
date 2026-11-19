@@ -91,4 +91,14 @@ rm -f .agents/records/drafts/smoke-task.closure
 .agents/harness/bin/write done "$TASK_ID"
 .agents/harness/bin/write check
 
+echo "==> 7. CMake isolate graph"
+CMAKE_DIR="$WORK/cmake-proj"
+mkdir -p "$CMAKE_DIR/libcore" "$CMAKE_DIR/app"
+printf 'cmake_minimum_required(VERSION 3.20)\nproject(demo)\nadd_subdirectory(libcore)\nadd_subdirectory(app)\n' > "$CMAKE_DIR/CMakeLists.txt"
+printf 'add_library(core core.c)\n' > "$CMAKE_DIR/libcore/CMakeLists.txt"
+printf 'add_executable(demo_app main.c)\ntarget_link_libraries(demo_app PRIVATE core pthread)\n' > "$CMAKE_DIR/app/CMakeLists.txt"
+(cd "$CMAKE_DIR" && CLAUDE_PROJECT_DIR="$CMAKE_DIR" "$WORK/.agents/harness/.cache/bin/isolate" graph) | tee "$WORK/cmake-graph.out"
+grep -q "choke (orchestrator owns): core" "$WORK/cmake-graph.out"
+grep -q "demo_app  app  reads core" "$WORK/cmake-graph.out"
+
 echo "==> Smoke test passed."

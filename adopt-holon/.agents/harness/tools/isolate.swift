@@ -1,5 +1,5 @@
-// isolate.swift — reads the project's build manifests (SwiftPM Package.swift, Cargo.toml, or Node package.json / pnpm-workspace.yaml) under the project root and decides which tasks can run in parallel without touching each other's compile inputs (rules/DELEGATION.md).
-// ADOPTION NOTE (/adopt-holon): SwiftPM, Cargo, and Node/pnpm workspaces work out of the box. For CMake, Meson, Ninja, Go, Bazel, or Make, add a loader to `loadGraph` while keeping `Graph`, `Claim`, and the CLI unchanged.
+// isolate.swift — reads the project's build manifests (SwiftPM Package.swift, Cargo.toml, Node package.json / pnpm-workspace.yaml, Go go.mod, or CMake CMakeLists.txt) under the project root and decides which tasks can run in parallel without touching each other's compile inputs (rules/DELEGATION.md).
+// ADOPTION NOTE (/adopt-holon): SwiftPM, Cargo, Node/pnpm, Go, and CMake work out of the box. For Meson, Ninja, Bazel, Gradle, or Make, add a loader to `loadGraph` while keeping `Graph`, `Claim`, and the CLI unchanged.
 // A worker's write set is one or more targets. Two workers conflict when either one's write set falls in the other's read closure (itself plus everything it depends on).
 // Usage: isolate graph | plan [--max N] [--choke a,b] [--package file] <task…> | owner <path…> | claim <name> <task…> | release <name…|--all> | claims
 //   task: a target name, several joined by commas (`Syntax,Theme`), or a path under a target's folder.
@@ -305,11 +305,109 @@ func loadManifests(root: String, file: String?) -> [Manifest]? {
     return found.isEmpty ? nil : found
 }
 
-/// Loads the target graph from SwiftPM (`Package.swift`), Cargo (`Cargo.toml`), or Node (`package.json`).
+/// Loads a Go module graph via `go list -json ./...`, or nil when `go.mod` or `go` is absent.
+func loadGoGraph(root: String) -> Graph? {
+    guard FileManager.default.fileExists(atPath: root + "/go.mod") else { return nil }
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["go", "list", "-json", "./..."]
+    process.currentDirectoryURL = URL(fileURLWithPath: root)
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    guard (try? process.run()) != nil else { return nil }
+    let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else { return nil }
+    // `go list -json` prints concatenated JSON objects; wrap as an array.
+    let arrayText = "[" + text.replacingOccurrences(of: "}\n{", with: "},\n{") + "]"
+    guard let data = arrayText.data(using: .utf8),
+        let packages = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+    else { return nil }
+    let prefix = URL(fileURLWithPath: root).resolvingSymlinksInPath().path + "/"
+    var pathByImport: [String: String] = [:]
+    for pkg in packages {
+        guard let imp = pkg["ImportPath"] as? String, let dir = pkg["Dir"] as? String else { continue }
+        let resolved = URL(fileURLWithPath: dir).resolvingSymlinksInPath().path
+        let rel = resolved.hasPrefix(prefix) ? String(resolved.dropFirst(prefix.count)) : "."
+        pathByImport[imp] = rel
+    }
+    let targets: [Target] = packages.compactMap { pkg in
+        guard let imp = pkg["ImportPath"] as? String, let rel = pathByImport[imp] else { return nil }
+        let shortName = rel == "." ? ((pkg["Name"] as? String) ?? imp) : rel
+        let imports = (pkg["Imports"] as? [String]) ?? []
+        let internalDeps = imports.compactMap { pathByImport[$0] }.map { $0 == "." ? shortName : $0 }
+        let externals = imports.filter { pathByImport[$0] == nil && $0.contains(".") }
+        return Target(name: shortName, package: imp, path: rel, deps: internalDeps, externals: externals)
+    }
+    return targets.isEmpty ? nil : Graph(targets)
+}
+
+/// Loads a CMake target graph by scanning `CMakeLists.txt` files for `add_library`/`add_executable` and `target_link_libraries`.
+func loadCMakeGraph(root: String) -> Graph? {
+    let fm = FileManager.default
+    guard fm.fileExists(atPath: root + "/CMakeLists.txt") else { return nil }
+    var files: [(relDir: String, text: String)] = []
+    if let top = try? String(contentsOfFile: root + "/CMakeLists.txt", encoding: .utf8) {
+        files.append((".", top))
+    }
+    let skip: Set<String> = [".git", ".build", "build", "builddir", ".cache", "node_modules", "target"]
+    if let en = fm.enumerator(atPath: root) {
+        while let rel = en.nextObject() as? String {
+            let parts = rel.split(separator: "/").map(String.init)
+            if parts.contains(where: { skip.contains($0) }) { continue }
+            if (rel as NSString).lastPathComponent == "CMakeLists.txt", rel != "CMakeLists.txt" {
+                let dir = (rel as NSString).deletingLastPathComponent
+                if let text = try? String(contentsOfFile: root + "/" + rel, encoding: .utf8) {
+                    files.append((dir.isEmpty ? "." : dir, text))
+                }
+            }
+        }
+    }
+    let targetRe = try? NSRegularExpression(pattern: #"(?i)\badd_(?:library|executable)\s*\(\s*([A-Za-z0-9_.-]+)"#)
+    let linkRe = try? NSRegularExpression(pattern: #"(?is)\btarget_link_libraries\s*\(\s*([A-Za-z0-9_.-]+)([^)]*)\)"#)
+    let keywords: Set<String> = ["PUBLIC", "PRIVATE", "INTERFACE", "LINK_PUBLIC", "LINK_PRIVATE", "OPTIMIZED", "DEBUG"]
+    var rawTargets: [(name: String, dir: String)] = []
+    var linksByTarget: [String: [String]] = [:]
+    for entry in files {
+        let cleaned =
+            entry.text.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.split(separator: "#", maxSplits: 1).first.map(String.init) ?? "" }.joined(separator: "\n")
+        let range = NSRange(cleaned.startIndex..., in: cleaned)
+        for match in targetRe?.matches(in: cleaned, range: range) ?? [] {
+            if let r = Range(match.range(at: 1), in: cleaned) {
+                let name = String(cleaned[r])
+                if !name.hasPrefix("$") { rawTargets.append((name, entry.relDir)) }
+            }
+        }
+        for match in linkRe?.matches(in: cleaned, range: range) ?? [] {
+            guard let nr = Range(match.range(at: 1), in: cleaned), let lr = Range(match.range(at: 2), in: cleaned)
+            else { continue }
+            let name = String(cleaned[nr])
+            let tokens =
+                cleaned[lr].split(whereSeparator: { $0.isWhitespace }).map(String.init)
+                .filter { !keywords.contains($0.uppercased()) && !$0.hasPrefix("-") && !$0.hasPrefix("$") }
+            linksByTarget[name, default: []] += tokens
+        }
+    }
+    let known = Set(rawTargets.map(\.name))
+    let targets = rawTargets.map { item in
+        let links = linksByTarget[item.name] ?? []
+        return Target(
+            name: item.name, package: item.name, path: item.dir,
+            deps: links.filter { known.contains($0) },
+            externals: links.filter { !known.contains($0) })
+    }
+    return targets.isEmpty ? nil : Graph(targets)
+}
+
+/// Loads the target graph from SwiftPM (`Package.swift`), Cargo (`Cargo.toml`), Node (`package.json`), Go (`go.mod`), or CMake (`CMakeLists.txt`).
 func loadGraph(root: String, file: String?) -> Graph? {
     if let manifests = loadManifests(root: root, file: file) { return buildGraph(manifests) }
     if file == nil, let cargo = loadCargoGraph(root: root) { return cargo }
     if file == nil, let node = loadNodeGraph(root: root) { return node }
+    if file == nil, let go = loadGoGraph(root: root) { return go }
+    if file == nil, let cmake = loadCMakeGraph(root: root) { return cmake }
     return nil
 }
 
@@ -566,7 +664,8 @@ func run(_ args: [String], root: String) -> Int32 {
     }
     guard let graph = loadGraph(root: root, file: flags.package) else {
         let wherePath = flags.package ?? root
-        let msg = "isolate: no readable manifest (Package.swift, Cargo.toml, package.json) under \(wherePath)\n"
+        let msg =
+            "isolate: no readable manifest (Package.swift, Cargo.toml, package.json, go.mod, CMakeLists.txt) under \(wherePath)\n"
         FileHandle.standardError.write(Data(msg.utf8))
         return 2
     }
