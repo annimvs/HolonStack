@@ -1,0 +1,10 @@
+entry(271215c6) {
+  name: "Binary search on sorted data"
+  kind: algorithm
+  use_when: "Find where a value belongs in sorted data without scanning it."
+  smell: "a linear scan or a hand written halving loop"
+  detect: "`.first(where:` or `.firstIndex(where:`"
+  ships: swift_algorithms
+  api: "Algorithms product, partitioningIndex(where:)"
+  cost: "O(log n) time"
+}

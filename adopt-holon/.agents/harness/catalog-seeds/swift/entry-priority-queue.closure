@@ -1,0 +1,10 @@
+entry(b6cb4578) {
+  name: "Priority queue"
+  kind: structure
+  use_when: "Repeatedly take the smallest or largest item while new items keep arriving."
+  smell: "sorting an array after every insert, or scanning for the minimum"
+  detect: "`.sort(` or `.sorted(` or `.min(` or `.max(`"
+  ships: swift_collections
+  api: "Collections product, Heap"
+  cost: "O(log n) insert and remove, O(1) peek"
+}

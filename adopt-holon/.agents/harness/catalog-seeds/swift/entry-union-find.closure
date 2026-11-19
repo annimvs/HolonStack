@@ -1,0 +1,9 @@
+entry(19620e6a) {
+  name: "Union find"
+  kind: structure
+  use_when: "Track which items are connected, such as groups or components."
+  smell: "rebuilding connected groups with repeated graph searches"
+  ships: none
+  api: "implement as parent and rank arrays"
+  cost: "near constant amortized per operation"
+}

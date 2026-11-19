@@ -1,0 +1,9 @@
+entry(3a5f0ce1) {
+  name: "Sorting"
+  kind: algorithm
+  use_when: "Order a collection by a key or comparator."
+  smell: "a hand written bubble, insertion or selection sort"
+  ships: stdlib
+  api: "sorted(by:) or sort(by:)"
+  cost: "O(n log n) time"
+}

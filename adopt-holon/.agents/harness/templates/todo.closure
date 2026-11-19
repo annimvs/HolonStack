@@ -1,0 +1,4 @@
+// store: TODO.closure
+todo() {
+  tasks: many [ use(task) ]
+}

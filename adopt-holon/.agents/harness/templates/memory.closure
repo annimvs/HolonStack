@@ -1,0 +1,7 @@
+// store: MEMORIES/memory-{name}.closure
+memory(id()) {
+  name:        grok("noun phrase, <= 8 words, no dashes")
+  description: grok("one line, <= 120 chars")
+  type:        enum(user, feedback, project, reference)
+  body:        text("plain prose; link other memories with [[id]]")
+}

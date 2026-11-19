@@ -1,0 +1,10 @@
+[
+  {
+    "pattern": "(^|[;&|(`[:space:]])python3?[[:space:]]+[^;&|]*(-c[[:space:]]|-[[:space:]]*<<|<<)|(^|[;&|(`[:space:]])python3?[[:space:]]+<<",
+    "message": "write the script as a .swift file in .agents/harness/tools/ and call it through its bin/ entry point, which builds and caches it, instead of generating Python (see .agents/harness/rules/SCRIPTS.md)"
+  },
+  {
+    "pattern": "(^|[;&|(`[:space:]])python3?[[:space:]]+([^;&|[:space:]]+[[:space:]]+)*(/tmp|/private/tmp|/var/folders)[^[:space:];&|]*\\.py([[:space:]]|$)",
+    "message": "a generated Python script in a temp directory; write a .swift script and run it with swift, or put it in .agents/harness/tools/, instead (see .agents/harness/rules/SCRIPTS.md)"
+  }
+]

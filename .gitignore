@@ -1,0 +1,4 @@
+.DS_Store
+**/.agents/harness/.cache/
+**/.agents/records/.write.lock
+adopt-holon-*.zip

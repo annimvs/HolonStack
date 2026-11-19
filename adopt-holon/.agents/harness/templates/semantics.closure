@@ -1,0 +1,10 @@
+// store: SEMANTICS/semantics-{name}.closure
+semantics(id()) {
+  name:  grok("the area as one lowercase word, such as executor; the router and its messages use it")
+  scope: enum(always, routed)
+  paths: many [ grok("a path prefix relative to the project root, such as Sources/Core/ or Packages/Parser/") ]
+  cues:  many [ grok("a lowercase word or phrase that a prompt about this area contains, such as heredoc") ]
+  holds: text("what is true in this area, one plain statement per line, stated as fact, never as an order")
+  terms: text("the words that mean one thing here, one per line: term: meaning")
+  next:  text("the files to open next, one per line: path: when")
+}

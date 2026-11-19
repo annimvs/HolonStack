@@ -1,0 +1,8 @@
+// store: ISSUES/issue-{name}.closure
+issue(id()) {
+  name:   grok("noun phrase, >= 2 words, <= 8 words, no dashes")
+  area:   grok("the part of the project, <= 4 words")
+  status: enum(open, fixed, wontfix)
+  repro:  text("the steps or command that show it, what happens, and what should happen")
+  fix:    opt(grok("where it was fixed, <= 30 words"))
+}

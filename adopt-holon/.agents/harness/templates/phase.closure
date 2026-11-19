@@ -1,0 +1,20 @@
+// store: PHASES/phase-{n}-{name}.closure
+phase(id()) {
+  n:       index()
+  name:    grok("noun phrase, <= 8 words, no dashes")
+  depends: many [ ref(phase) ]
+  tasks:   many [
+    task(id()) {
+      name: grok("verb phrase, <= 8 words, no dashes")
+      est:  duration()
+      done: bool(false)
+      criteria: opt(many [
+        criterion(id()) {
+          text:  grok("a condition that must be true when the task is done")
+          check: grok("a shell command that exits 0 when it is true, or the word manual")
+        }
+      ])
+    }
+  ]
+  done:    derived(all(tasks.done))
+}

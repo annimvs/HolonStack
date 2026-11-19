@@ -1,0 +1,16 @@
+{
+  "events": {
+    "pre-shell": ["hooks/guard-bash.swift", "hooks/rewrite-bash.swift", "hooks/guard-search.swift"],
+    "pre-search": ["hooks/guard-search.swift"],
+    "pre-edit": ["hooks/guard-edit.swift"],
+    "post-shell": ["hooks/check-shell-edit.swift"],
+    "post-edit": ["hooks/check-edit.swift", "hooks/route-semantics.swift"],
+    "post-read": ["hooks/route-semantics.swift"],
+    "prompt-submit": ["hooks/route-semantics.swift"],
+    "pre-compact": ["hooks/pre-compact.swift"],
+    "post-compact": ["hooks/post-compact.swift"],
+    "session-compact": ["hooks/session-compact.swift"],
+    "stop": ["hooks/check-drafts.swift"],
+    "subagent-stop": ["hooks/check-drafts.swift"]
+  }
+}

@@ -1,0 +1,7 @@
+// store: PLAN.closure
+plan(id()) {
+  title:    grok("one line, <= 60 chars")
+  synopsis: grok("one sentence, <= 30 words")
+  abstract: grok("<= 3 sentences, <= 80 words")
+  phases:   many [ use(phase) ]
+}

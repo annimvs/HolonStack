@@ -1,0 +1,10 @@
+entry(2eafe8d8) {
+  name: "Double ended queue"
+  kind: structure
+  use_when: "Push and pop at both ends in constant time, such as a work queue or a sliding window."
+  smell: "an array using removeFirst or insert at index zero"
+  detect: "`.removeFirst(` or `at: 0)`"
+  ships: swift_collections
+  api: "Collections product, Deque"
+  cost: "O(1) at both ends, O(n) space"
+}
