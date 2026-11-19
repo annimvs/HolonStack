@@ -49,6 +49,7 @@ func claudeWanted(events: [String: [String]]) -> NSDictionary {
         "stop": ("Stop", ""), "subagent-stop": ("SubagentStop", ""),
         "pre-compact": ("PreCompact", ""), "post-compact": ("PostCompact", ""),
         "session-compact": ("SessionStart", "compact"), "pre-search": ("PreToolUse", "Grep"),
+        "pre-agent": ("PreToolUse", "Agent"),
         "prompt-submit": ("UserPromptSubmit", ""), "post-read": ("PostToolUse", "Read"),
     ]
     var hooks: [String: Any] = [:]
@@ -78,6 +79,7 @@ func geminiWanted(events: [String: [String]]) -> NSDictionary {
         ),
         ("post-read", "PostToolUse", "view_file|read_file"),
         ("pre-search", "PreToolUse", "grep_search"),
+        ("pre-agent", "PreToolUse", "invoke_subagent"),
     ]
     var harnessHook: [String: Any] = [:]
     for (event, hookEvent, matcher) in toolMap {
