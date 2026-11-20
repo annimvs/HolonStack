@@ -187,10 +187,14 @@ func shellSegments(_ s: String) -> [[String]] {
 let home = environment["HOME"] ?? NSHomeDirectory()
 let tmpTrim = (environment["TMPDIR"] ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
-/// `~`, `$HOME` and `${HOME}` as the shell would expand them.
+/// `~`, `$HOME`, `${HOME}`, `$TMPDIR` and `${TMPDIR}` as the shell would expand them.
 func expand(_ w: String) -> String {
     if w == "~" || w.hasPrefix("~/") { return home + w.dropFirst() }
     for v in ["${HOME}", "$HOME"] where w.hasPrefix(v) { return home + w.dropFirst(v.count) }
+    if !tmpTrim.isEmpty {
+        let tmpRoot = "/" + tmpTrim
+        for v in ["${TMPDIR}", "$TMPDIR"] where w.hasPrefix(v) { return tmpRoot + w.dropFirst(v.count) }
+    }
     return w
 }
 let startCwd = (rawInput["cwd"] as? String) ?? proj
@@ -292,15 +296,20 @@ func unwrapCommand(_ seg: [String]) -> (prog: String, args: [String], viaXargs: 
 /// Shells whose `-c` argument runs a nested command string.
 let nestedShells: Set<String> = ["sh", "bash", "zsh", "dash", "ksh", "fish"]
 
-/// Splits a command into simple commands and recursively expands `sh -c <script>` payloads up to `depth` 4.
+/// Splits a command into simple commands and recursively expands `sh -c` and `eval` payloads up to `depth` 4.
 func expandedSegments(_ command: String, depth: Int = 0) -> [[String]] {
     var out: [[String]] = []
     for seg in shellSegments(command) {
         out.append(seg)
-        guard depth < 4, let (prog, args, _) = unwrapCommand(seg), nestedShells.contains(prog) else { continue }
-        for i in args.indices where matches(#"^-[a-zA-Z]*c$"#, args[i]) {
-            if i + 1 < args.count { out += expandedSegments(args[i + 1], depth: depth + 1) }
-            break
+        guard depth < 4, let (prog, args, _) = unwrapCommand(seg) else { continue }
+        if prog == "eval" {
+            let body = (args.first == "--" ? Array(args.dropFirst()) : args).joined(separator: " ")
+            if !body.isEmpty { out += expandedSegments(body, depth: depth + 1) }
+        } else if nestedShells.contains(prog) {
+            for i in args.indices where matches(#"^-[a-zA-Z]*c$"#, args[i]) {
+                if i + 1 < args.count { out += expandedSegments(args[i + 1], depth: depth + 1) }
+                break
+            }
         }
     }
     return out
