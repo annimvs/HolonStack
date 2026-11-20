@@ -117,8 +117,9 @@ wantedShims["build.sh"] = """
         name="$(basename "$f" .swift)"; bin="$root/.cache/bin/$name"
         if [ -x "$bin" ] && [ ! "$f" -nt "$bin" ]; then continue; fi
         (
-            if swiftc -Onone -gnone -o "$bin.$$" "$f" 2>/dev/null; then mv -f "$bin.$$" "$bin"
-            else rm -f "$bin.$$"; echo "build.sh: $name did not compile" >&2; fi
+            err="$(swiftc -Onone -gnone -o "$bin.$$" "$f" 2>&1)"
+            if [ $? -eq 0 ]; then mv -f "$bin.$$" "$bin"
+            else rm -f "$bin.$$"; echo "build.sh: $name did not compile" >&2; printf '%s\\n' "$err" >&2; fi
         ) &
         n=$((n + 1)); if [ $((n % 4)) -eq 0 ]; then wait; fi
     done

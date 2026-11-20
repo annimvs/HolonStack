@@ -15,7 +15,7 @@ jobs:
       matrix:
         os: [macos-15, ubuntu-24.04]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Swift 6 on Ubuntu
         if: runner.os == 'Linux'

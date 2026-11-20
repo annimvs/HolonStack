@@ -56,41 +56,24 @@ struct Filter {
 
 // MARK: - Running
 
-/// Starts `/bin/sh -c command` with its stdout and stderr on one pipe (`posix_spawn`, so arguments reach it unchanged),
-/// writes every byte to `log`, feeds each line to `filter`, and returns the command's exit status.
+/// Starts `/bin/sh -c command` with its stdout and stderr on one pipe, writes every byte to `log`,
+/// feeds each line to `filter`, and returns the command's exit status.
 func runFiltered(_ command: String, log: FileHandle, filter: inout Filter) -> Int32 {
-    var fds: [Int32] = [0, 0]
-    guard pipe(&fds) == 0 else { return 127 }
-    #if canImport(Darwin)
-        var actions: posix_spawn_file_actions_t?
-    #else
-        var actions = posix_spawn_file_actions_t()
-    #endif
-    posix_spawn_file_actions_init(&actions)
-    defer { posix_spawn_file_actions_destroy(&actions) }
-    posix_spawn_file_actions_adddup2(&actions, fds[1], STDOUT_FILENO)
-    posix_spawn_file_actions_adddup2(&actions, fds[1], STDERR_FILENO)
-    posix_spawn_file_actions_addclose(&actions, fds[0])
-    posix_spawn_file_actions_addclose(&actions, fds[1])
-    let argv: [UnsafeMutablePointer<CChar>?] = ["/bin/sh", "-c", command].map { strdup($0) } + [nil]
-    defer { argv.forEach { free($0) } }
-    var pid: pid_t = 0
-    #if canImport(Darwin)
-        let spawned = posix_spawn(&pid, "/bin/sh", &actions, nil, argv, environ)
-    #else
-        let envp: [UnsafeMutablePointer<CChar>?] =
-            ProcessInfo.processInfo.environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
-        defer { envp.forEach { free($0) } }
-        let spawned = posix_spawn(&pid, "/bin/sh", &actions, nil, argv, envp)
-    #endif
-    close(fds[1])
-    guard spawned == 0 else {
-        close(fds[0])
-        let reason = String(cString: strerror(spawned))
-        FileHandle.standardError.write(Data("filter-run: cannot start /bin/sh: \(reason)\n".utf8))
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = ["-c", command]
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = pipe
+    do {
+        try process.run()
+    } catch {
+        FileHandle.standardError.write(Data("filter-run: cannot start /bin/sh: \(error)\n".utf8))
         return 127
     }
-    let reader = FileHandle(fileDescriptor: fds[0], closeOnDealloc: true)
+    // parent does not write to the pipe; close it so the reader sees EOF when the child exits
+    try? pipe.fileHandleForWriting.close()
+    let reader = pipe.fileHandleForReading
     var pending = Data()
     while true {
         let chunk = reader.availableData
@@ -103,11 +86,9 @@ func runFiltered(_ command: String, log: FileHandle, filter: inout Filter) -> In
         }
     }
     if !pending.isEmpty { filter.consume(String(decoding: pending, as: UTF8.self)) }
-    var status: Int32 = 0
-    while waitpid(pid, &status, 0) == -1 && errno == EINTR {}
+    process.waitUntilExit()
     // the exit code, or 128 plus the signal that ended it, as a shell reports it
-    let signal = status & 0x7f
-    return signal == 0 ? (status >> 8) & 0xff : 128 + signal
+    return process.terminationReason == .uncaughtSignal ? 128 + process.terminationStatus : process.terminationStatus
 }
 
 // MARK: - Main
@@ -126,7 +107,7 @@ func main() -> Int32 {
     let stamp = DateFormatter()
     stamp.dateFormat = "yyyyMMdd-HHmmss"
     stamp.locale = Locale(identifier: "en_US_POSIX")
-    let logPath = "\(logDir)/\(stamp.string(from: Date()))-\(getpid()).log"
+    let logPath = "\(logDir)/\(stamp.string(from: Date()))-\(ProcessInfo.processInfo.processIdentifier).log"
     guard FileManager.default.createFile(atPath: logPath, contents: nil),
         let log = FileHandle(forWritingAtPath: logPath)
     else {
