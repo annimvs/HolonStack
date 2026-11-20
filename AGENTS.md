@@ -1,9 +1,8 @@
-# AGENTS — <Project Name>
+# AGENTS — HolonStack
 
 > **AGENTS: maintain this file with Haiku or a similar-class model, in grok'd prose.** Style rules: [QUIET](.agents/harness/rules/QUIET.md), [PROSE](.agents/harness/rules/PROSE.md).
 
-<!-- STUB: Run /adopt-holon to replace <Project Name> and this summary with a one-paragraph overview of the project's packages, targets, products, and relative path conventions. -->
-This folder holds `<Project Name>`: replace this stub during `/adopt-holon` with the packages or modules in this workspace, what each product builds, and how paths in docs, records and hooks resolve relative to this root.
+This folder holds **HolonStack**: the portable `.agents/` harness, Swift 6 CLI tools and hooks, and structured `.closure` record system shipped as the installable `/adopt-holon` skill bundle (`adopt-holon/`). Root `.agents/` dogfoods the harness for HolonStack itself (with project-specific maps, upstream agent-platform specs in `.agents/reference/`, and live records in `.agents/records/`); `adopt-holon/.agents/` is the clean template bundle copied into adopting repositories, verified end-to-end by `scripts/smoke-test.sh`. All paths in docs, records, and hooks resolve relative to this repository root.
 
 Start at [.agents/ATLAS.md](.agents/ATLAS.md): it maps every path under `.agents/` to a detail file. Open only the one you need. `CLAUDE.md` and `GEMINI.md` link to this file.
 

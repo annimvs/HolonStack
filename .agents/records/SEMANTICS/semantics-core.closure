@@ -4,13 +4,14 @@ semantics(ead2a54f) {
   paths: []
   cues: []
   holds: """
-    Replace this first line during /adopt-holon with a one-line summary of the project's packages, targets and products. Paths are relative to the project root folder.
+    HolonStack ships the portable .agents/ harness as adopt-holon/ while dogfooding it at the repo root; scripts/smoke-test.sh verifies the bundle end to end.
     Replies to the user are prose; plans, tasks, memories, questions and issues are closures filed through .agents/harness/bin/write.
     Commits and pushes in this repository are the user's; write done ticks a task and commits nothing.
     The code wins over any doc; a doc that disagrees with the code is the thing to fix.
     Scripts and hooks under .agents/harness/ are single Swift files; the harness uses no Python.
     Project files change through .agents/harness/bin/edit; the built-in Edit and Write tools are refused on project files.
     Find code with .agents/harness/bin/seek TERM [PATH…], not grep: it returns whole units as FILE:A-B plus a hash for edit --range.
+    Root .agents/records/ holds HolonStack's own state; adopt-holon/.agents/records/ stays as the clean template store.
     """
   terms: """
     record: a closure under .agents/records/, written only through bin/write

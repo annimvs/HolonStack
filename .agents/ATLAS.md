@@ -1,16 +1,15 @@
-# ATLAS — <Project Name>
+# ATLAS — HolonStack
 
 > **AGENTS: maintain this file with Haiku or a similar-class model, in grok'd prose.** Style rules: [QUIET](harness/rules/QUIET.md), [PROSE](harness/rules/PROSE.md).
 
-<!-- STUB: Run /adopt-holon to replace <Project Name>, the workspace description below, and the stub rows under "The code", "Maps", and "Domain references" with the adopting project's real modules, maps, and authoritative domain specs. -->
-Add, remove or rename a file under `.agents/` → update its row here in the same change. Detail files are linked, not imported. Open only the row you need. The project is the folder above `.agents/`, and every path in these docs is relative to that folder.
+Add, remove or rename a file under `.agents/` → update its row here in the same change. Detail files are linked, not imported. Open only the row you need. The project is the HolonStack repository above `.agents/`, and every path in these docs is relative to that folder.
 
 ## Before any work
 
 1. **Replies are prose; records are closures.** Anything a script or another agent reads (a plan, a task, a memory, a question) is a closure filed through `harness/bin/write`. What you say to the user is plain prose drawn from it ([NOTATION](harness/rules/NOTATION.md)).
 2. **Read memory and open work first:** [MEMORY.md](records/MEMORY.md), then `harness/bin/write list task` and `write next`. Something blocked on the user is a `question` ([OPEN.md](records/OPEN.md)).
 3. **Never commit.** `write done` ticks a task after its criteria pass and commits nothing; commits in this project are the user's.
-4. **Behavior is verified, not argued:** a claim about behavior is settled by the project's test or verification suite, never by reading the source alone.
+4. **Behavior is verified, not argued:** verify harness changes with `./scripts/smoke-test.sh` plus `write check`, `check-docs`, `lint`, and `sync-settings --check`, never by reading the source alone.
 
 ## State
 
@@ -33,24 +32,27 @@ Add, remove or rename a file under `.agents/` → update its row here in the sam
 
 | Path | Open when | Detail |
 |---|---|---|
-| `codebase/CODEBASE.md` | Orienting in the project's targets and packages, or deciding where a change belongs: the module map, a task-to-code table, the domain glossary, the layering rules | [CODEBASE.md](codebase/CODEBASE.md) |
-| `codebase/LIFECYCLE.md` | Following an operation end to end through the system: entry points, domain pipelines, state transitions, boundaries and invariants | [LIFECYCLE.md](codebase/LIFECYCLE.md) |
+| `codebase/CODEBASE.md` | Orienting in HolonStack's components, layers, glossary, or deciding where a change belongs | [CODEBASE.md](codebase/CODEBASE.md) |
+| `codebase/LIFECYCLE.md` | Following hook dispatch, `bootstrap.sh` / `sync-settings`, or record writes end to end | [LIFECYCLE.md](codebase/LIFECYCLE.md) |
 
 ### Maps: which file owns what
 
-<!-- STUB: During /adopt-holon, replace codebase/maps/module-template.md with one map per target or bounded context and list each row here. -->
-
 | Area | Open when | Map |
 |---|---|---|
-| `Sources/<Target>/` | Stub map template — replace with one row per target or module during `/adopt-holon` | [module-template](codebase/maps/module-template.md) |
+| `adopt-holon/` | Changing the `/adopt-holon` skill entrypoint, stubs, or shipped template bundle | [adopt-holon](codebase/maps/adopt-holon.md) |
+| `harness/hooks/`, `harness/guards.d/` | Changing a lifecycle hook, client wiring sync, or Bash regex guard | [harness-hooks](codebase/maps/harness-hooks.md) |
+| `harness/tools/`, `harness/bin/` | Changing `write`, `edit`, `seek`, `isolate`, `lint`, `check-docs`, or `bootstrap.sh` | [harness-tools](codebase/maps/harness-tools.md) |
+| `scripts/`, `.github/` | Changing end-to-end smoke verification or CI workflows | [scripts-and-ci](codebase/maps/scripts-and-ci.md) |
 
 ## Domain references
 
-<!-- STUB: During /adopt-holon, identify the project's domain standards, RFCs, specifications and papers (DDD), download them into reference/<TOPIC>/, and add one row per topic here. -->
-
 | Path | Open when | Detail |
 |---|---|---|
-| `reference/` | Checking an authoritative RFC, protocol specification, standard or domain paper that the project implements or follows | [reference/README.md](reference/README.md) |
+| `reference/` | Index of all downloaded upstream agent-platform and standard specs | [reference/README.md](reference/README.md) |
+| `reference/CLAUDE_CODE/` | Verifying Claude Code hooks, tool-use schemas, skills, settings, `CLAUDE.md`, or subagent contracts | [reference/README.md](reference/README.md) |
+| `reference/ANTIGRAVITY/` | Verifying Antigravity or Gemini CLI hooks, skills, rules, or plugin specs | [reference/README.md](reference/README.md) |
+| `reference/OPENAI/` | Verifying OpenAI Codex CLI hooks, skills, rules, subagents, `AGENTS.md`, or function-calling specs | [reference/README.md](reference/README.md) |
+| `reference/STANDARDS/` | Checking cross-client Agent Skills (`agentskills.io`) or `AGENTS.md` specifications | [reference/README.md](reference/README.md) |
 
 ## Harness
 
@@ -61,7 +63,7 @@ Add, remove or rename a file under `.agents/` → update its row here in the sam
 | `harness/templates/*.closure` | The fields, limits and store path of a record kind; edited only by the user | [NOTATION](harness/rules/NOTATION.md) |
 | `harness/reasons.closure` | The reason codes a stuck draft may cite, and where each goes; edited only by the user | [ESCALATION](harness/rules/ESCALATION.md) |
 | `harness/lint.closure`, `harness/tools/lint.swift` | The Swift lint rules and their checker, run on every saved `.swift` under `harness/` | [SWIFT](harness/rules/SWIFT.md) |
-| `harness/hooks/`, `harness/hooks.json`, `harness/guards.d/`, `hooks.json` | What runs on each tool call (including `rewrite-bash`, which sends build commands through `bin/filter-run` and keeps the full log), and the project's own Bash rules (`guards.d/`: `criteria-bash`, `python-scripts`, `records-delete`). `sync-settings` generates the wiring, including the top-level `.agents/hooks.json`: never edit it | [harness/README.md](harness/README.md) |
+| `harness/hooks/`, `harness/hooks.json`, `harness/guards.d/`, `hooks.json` | What runs on each tool call (including `rewrite-bash`, which sends build commands through `bin/filter-run` and keeps the full log), and the project's own Bash rules (`guards.d/`: `adopt-template-records`, `criteria-bash`, `python-scripts`, `records-delete`). `sync-settings` generates the wiring, including the top-level `.agents/hooks.json`: never edit it | [harness/README.md](harness/README.md) |
 | `harness/.cache/`, `harness/.swift-format` | Built `bin/` binaries, per-session semantics state, and the compaction archive; all regenerated or machine-written. The formatter config for the lint | [harness/README.md](harness/README.md) |
 | `harness/tools/edit.swift` | Changing a project file: the exact-match editor (`bin/edit`) agents use in place of the built-in Edit and Write tools. `check-shell-edit` runs the Edit checks after each call, and `guard-bash` and `guard-edit` hold it to the same protected files and worker claims. `--range A-B` replaces, deletes or reads whole lines | [EDITING](harness/rules/EDITING.md) |
 | `harness/tools/seek.swift`, `harness/hooks/guard-search.swift` | Finding code, docs or records: `bin/seek TERM [PATH…]` returns the whole unit around each hit with its line range and file hash, the input to `edit --range`. `guard-search` steers grep and rg on project paths to it (`HOLON_GREP_GUARD`: `off`, `advise` default, `deny`) | [seek skill](harness/skills/seek/SKILL.md) |
