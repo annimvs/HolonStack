@@ -2,7 +2,7 @@
 
 > **AGENTS: maintain this file with Haiku or a similar-class model, in grok'd prose.** Style rules: [QUIET](.agents/harness/rules/QUIET.md), [PROSE](.agents/harness/rules/PROSE.md).
 
-<!-- STUB: Run /adopt-holon to replace <Project Name> and this summary with a one-paragraph overview of the project's packages, targets, products, and relative path conventions. -->
+<!-- STUB: Run /adopt-holon to replace <Project Name> and this summary with a one-paragraph overview of the project's packages, targets, products, and relative path conventions, and create relative symlinks `CLAUDE.md -> AGENTS.md` and `GEMINI.md -> AGENTS.md` (`ln -s AGENTS.md CLAUDE.md && ln -s AGENTS.md GEMINI.md`). -->
 This folder holds `<Project Name>`: replace this stub during `/adopt-holon` with the packages or modules in this workspace, what each product builds, and how paths in docs, records and hooks resolve relative to this root.
 
 Start at [.agents/ATLAS.md](.agents/ATLAS.md): it maps every path under `.agents/` to a detail file. Open only the one you need. `CLAUDE.md` and `GEMINI.md` link to this file.

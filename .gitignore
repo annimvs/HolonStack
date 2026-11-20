@@ -4,6 +4,8 @@
 adopt-holon-*.zip
 .claude/
 .gemini/
+CLAUDE.md
+GEMINI.md
 
 .agents/harness/.cache/
 .agents/records/.write.lock

@@ -23,7 +23,7 @@ Copy or symlink `adopt-holon/` into your agent's skills directory:
   ```
 
 Then open any repository and invoke `/adopt-holon`. The skill:
-1. Copies the bundled `.agents/` and `AGENTS.md` (`CLAUDE.md` / `GEMINI.md` symlinks) into the repository root without clobbering existing settings.
+1. Copies the bundled `.agents/` and `AGENTS.md` into the repository root and creates relative `CLAUDE.md` and `GEMINI.md` symlinks to `AGENTS.md` without clobbering existing settings.
 2. Runs `.agents/harness/bin/bootstrap.sh` to compile all Swift tools and hooks and generate client wiring.
 3. Detects the project's build system and language(s), tailoring `isolate.swift`, `rewrite-bash.swift`, `check-edit.swift`, and `guards.d/` as needed.
 4. Inspects manifests and source files to populate `AGENTS.md`, `ATLAS.md`, `codebase/CODEBASE.md`, `codebase/LIFECYCLE.md`, and per-target `codebase/maps/*.md`.
@@ -39,9 +39,7 @@ HolonStack/
 ├── .gitignore                         # Ignores .DS_Store, .cache/, and .write.lock
 └── adopt-holon/                       # The installable /adopt-holon skill bundle
     ├── SKILL.md                       # Skill entrypoint (YAML frontmatter + adoption workflow)
-    ├── AGENTS.md                      # Root agent instructions stub
-    ├── CLAUDE.md -> AGENTS.md         # Relative symlink for Claude Code
-    ├── GEMINI.md -> AGENTS.md         # Relative symlink for Antigravity / Gemini
+    ├── AGENTS.md                      # Root agent instructions stub (/adopt-holon links CLAUDE.md and GEMINI.md to it)
     └── .agents/                       # Portable harness, docs, references, and records
         ├── ATLAS.md                   # Entry map: links every file under .agents/ (open only the row you need)
         ├── codebase/                  # Architecture & execution flow docs (populated during /adopt-holon)

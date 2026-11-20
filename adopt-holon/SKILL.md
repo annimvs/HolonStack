@@ -19,9 +19,11 @@ Use this skill when running `/adopt-holon` in a repository to install the bundle
      ```sh
      cp -R "$SKILL_DIR/.agents" .
      ```
-   - If `AGENTS.md` (or `CLAUDE.md` / `GEMINI.md`) does **not** exist yet, copy `$SKILL_DIR/AGENTS.md` along with its relative `CLAUDE.md` and `GEMINI.md` symlinks (preserving symlinks with `-P`):
+   - If `AGENTS.md` does **not** exist yet, copy `$SKILL_DIR/AGENTS.md` and create relative `CLAUDE.md` and `GEMINI.md` symlinks pointing to `AGENTS.md`:
      ```sh
-     cp -P "$SKILL_DIR/AGENTS.md" "$SKILL_DIR/CLAUDE.md" "$SKILL_DIR/GEMINI.md" .
+     cp "$SKILL_DIR/AGENTS.md" .
+     [ -e CLAUDE.md ] || ln -s AGENTS.md CLAUDE.md
+     [ -e GEMINI.md ] || ln -s AGENTS.md GEMINI.md
      ```
    - If the project **already has** `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`, do not overwrite it: merge the `.agents/ATLAS.md` pointer, record rules, `bin/edit` rule, and Compact instructions into the existing file, and include the required `> **AGENTS: maintain this file with Haiku or a similar-class model, in grok'd prose.**` banner in lines 1–8 of `AGENTS.md` so `bin/check-docs` passes.
 3. **Add harness caches to `.gitignore`:**
