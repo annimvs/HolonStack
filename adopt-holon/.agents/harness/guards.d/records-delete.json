@@ -1,4 +1,4 @@
 {
-  "pattern": "(?s)^(?=.*records).*(^|[;&|(`[:space:]])(rm|unlink|mv|trash)[[:space:]][^;&|]*(?<=[/[:space:]'\"])(MEMORIES|TASKS|PHASES|ISSUES|QUESTIONS|PROPOSALS|FINDINGS|CATALOG|DESIGN|RESULTS)/",
+  "pattern": "(?s)^(?=.*records).*(^|[;&|(`[:space:]])(rm|unlink|mv|trash)[[:space:]][^;&|]*(?<=[/[:space:]'\"])(MEMORIES|TASKS|PHASES|ISSUES|AUDITS|QUESTIONS|PROPOSALS|FINDINGS|CATALOG|DESIGN|RESULTS)/",
   "message": "a stored record is never deleted or moved from the shell: finished records stay, and its id stays in .ids (rules/RECORDS.md). To change one, edit its file (check-edit checks it); to close one, use write done, write fix or write answer. Drafts in records/drafts/ may be removed freely."
 }

@@ -96,6 +96,26 @@ rm -f .agents/records/drafts/smoke-task.closure
 .agents/harness/bin/write done "$TASK_ID"
 .agents/harness/bin/write check
 
+echo "==> 6b. Audit record lifecycle: write audit new -> AUDIT.md"
+cat > .agents/records/drafts/smoke-audit.closure <<'DRAFT'
+audit(_) {
+  name: "Stale diagram in codebase map"
+  area: docs
+  unit: ".agents/codebase/CODEBASE.md:10"
+  rule: "PRACTICES.md progressive disclosure"
+  impact: high
+  effort: low
+  fix: "Update module diagram to match current source targets."
+  status: open
+}
+DRAFT
+.agents/harness/bin/write audit check-draft .agents/records/drafts/smoke-audit.closure
+.agents/harness/bin/write audit new .agents/records/drafts/smoke-audit.closure >/dev/null
+rm -f .agents/records/drafts/smoke-audit.closure
+.agents/harness/bin/write render
+grep -q "Stale diagram in codebase map" .agents/records/AUDIT.md
+.agents/harness/bin/write check
+
 echo "==> 7. CMake isolate graph"
 CMAKE_DIR="$WORK/cmake-proj"
 mkdir -p "$CMAKE_DIR/libcore" "$CMAKE_DIR/app"

@@ -15,6 +15,7 @@ Everything lives under `.agents/records/`: the stores, their views, `drafts/`, t
 | `question` | `QUESTIONS/question-<slug>.closure` | something blocked on the user; `status` is `open`, `answered` or `dropped` |
 | `proposal` | `PROPOSALS/proposal-<slug>.closure`, listed in `PROPOSALS.md` | work proposed to the user: a summary, numbered `steps` with `points`, what is `yours` to do, and an `ask`; `status` is `open`, `accepted`, `rejected` or `done`. Needs `templates/proposal.closure` |
 | `issue` | `ISSUES/issue-<slug>.closure`, listed in `BUGS.md` | a confirmed bug: `area`, `repro`, `status` (`open`, `fixed`, `wontfix`) and, once closed, `fix`. Needs `templates/issue.closure` |
+| `audit` | `AUDITS/audit-<slug>.closure`, listed in `AUDIT.md` | an architectural, doc, modularity, pattern or language-rule finding from `/holon-audit`: `area`, `unit`, `rule`, `impact`, `effort`, `fix`, `status` (`open`, `proposed`, `fixed`, `wontfix`). Needs `templates/audit.closure` |
 | `semantics` | `SEMANTICS/semantics-<name>.closure` | one area's card for `route-semantics`: `scope` (`always` or `routed`), the `paths` and `cues` that select it, and what `holds`, its `terms` and the files `next`. Written as statements, not orders. Needs `templates/semantics.closure` |
 | `result` | `RESULTS/result-<slug>.closure` | what a delegated worker reports when it stops: `status` (`done`, `failed` or `blocked`), a prose `report` and the files it `touched`. `write status` prints the ones not yet reported ([DELEGATION](DELEGATION.md)). Needs `templates/result.closure` |
 | `interface` | `INTERFACES/interface-<slug>.closure` | the contract of one command: its `command_api` line, `inputs`, `output` and `error_exit`. No tool reads it yet, and nothing has filed one. Needs `templates/interface.closure` |
@@ -56,7 +57,7 @@ Every writing command prints one JSON envelope and takes the lock `.write.lock`.
 - `TODO.md`: the ad-hoc tasks in `TASKS/`, open ones first, then a Done list, each with its estimate and a link to its record.
 - `MEMORY.md`: one line per memory.
 - `OPEN.md`: unresolved questions.
-- `BUGS.md` and `PROPOSALS.md`.
+- `BUGS.md`, `AUDIT.md` and `PROPOSALS.md`.
 
 `PLAN.md` appears once a plan is filed. Never edit these by hand. Agents don't need them, except that tools auto-load `MEMORY.md`. `check` warns when one is stale.
 
@@ -71,7 +72,7 @@ Write drafts in `.agents/records/drafts/`. Fields in a draft can come in any ord
 
 ## What the hooks refuse
 
-The hook [`hooks/guard-edit.swift`](../hooks/guard-edit.swift) blocks an Edit or Write to `PLAN.closure`, `PLAN.md`, `TODO.closure`, `TODO.md`, `MEMORY.md`, `OPEN.md`, `BUGS.md`, `PROPOSALS.md`, `.ids`, `.write.lock` and anything under `templates/`. Only the writer changes the indexes and views, and only the user changes the rest. [`hooks/check-edit.swift`](../hooks/check-edit.swift) lints any edited `.closure` file and checks each record against its template. [`hooks/guard-bash.swift`](../hooks/guard-bash.swift) refuses a shell command that redirects, `tee`s, `sed -i`s, `rm`s, `mv`s or `cp`s onto a protected path. It checks what each command writes to, so a command that only mentions a record path in text passes. It cannot see a target built in a variable.
+The hook [`hooks/guard-edit.swift`](../hooks/guard-edit.swift) blocks an Edit or Write to `PLAN.closure`, `PLAN.md`, `TODO.closure`, `TODO.md`, `MEMORY.md`, `OPEN.md`, `BUGS.md`, `AUDIT.md`, `PROPOSALS.md`, `.ids`, `.write.lock` and anything under `templates/`. Only the writer changes the indexes and views, and only the user changes the rest. [`hooks/check-edit.swift`](../hooks/check-edit.swift) lints any edited `.closure` file and checks each record against its template. [`hooks/guard-bash.swift`](../hooks/guard-bash.swift) refuses a shell command that redirects, `tee`s, `sed -i`s, `rm`s, `mv`s or `cp`s onto a protected path. It checks what each command writes to, so a command that only mentions a record path in text passes. It cannot see a target built in a variable.
 
 ## Changing the writer
 
