@@ -13,4 +13,4 @@ Start at [.agents/ATLAS.md](.agents/ATLAS.md): it maps every path under `.agents
 
 ## Compact instructions
 
-When compacting, keep what the records don't hold: the current goal, files mid-edit with exact paths, the last failing command and its error, and rejected approaches with the reason. Point at records by id instead of restating them. Before a compaction, file decisions, open questions and unfinished work as records. Details: [COMPACT](.agents/harness/rules/COMPACT.md).
+Write compaction summaries in grok'd prose ([GROK](.agents/harness/rules/GROK.md): plain words, short sentences, lead with the point, no filler). Keep only what the records under `.agents/records/` don't hold: the current goal, files mid-edit with exact paths, the last failing command and its error, and rejected approaches with the reason. Point at records by id instead of restating them, and keep the user's instructions for this session word for word. Before a compaction, file decisions, open questions and unfinished work as records. Details: [COMPACT](.agents/harness/rules/COMPACT.md).

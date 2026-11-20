@@ -11,9 +11,11 @@ import Foundation
 /// What the compaction summary must keep, given to Claude Code on stdout for every compaction, manual or automatic.
 /// It matches AGENTS.md's "Compact instructions" and rules/COMPACT.md. Stays far under the 10,000-character cap.
 let summaryInstructions = """
-    Keep what the records under .agents/records/ don't hold: the current goal, files mid-edit with their exact \
-    paths, the last failing command and its error, and rejected approaches with the reason. Point at records by \
-    their id instead of restating them. Keep the user's own instructions for this session word for word.
+    Write the compaction summary in grok'd prose (.agents/harness/rules/GROK.md: plain words, short sentences, lead \
+    with the point, no filler). Keep only what the records under .agents/records/ don't hold: the current goal, \
+    files mid-edit with exact paths, the last failing command and its error, and rejected approaches with the reason. \
+    Point at records by id instead of restating them. Keep the user's own instructions for this session word for \
+    word.
     """
 
 // MARK: - Archive
