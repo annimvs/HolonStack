@@ -8,6 +8,11 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/holonstack-smoke.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
+echo "==> 0. Verify root .agents/harness matches adopt-holon/.agents/harness"
+diff -rq -x .cache -x .DS_Store -x bin -x adopt-template-records.json \
+    "$REPO_ROOT/.agents/harness" "$REPO_ROOT/adopt-holon/.agents/harness"
+diff -q "$REPO_ROOT/.agents/harness/bin/bootstrap.sh" "$REPO_ROOT/adopt-holon/.agents/harness/bin/bootstrap.sh"
+
 echo "==> Staging synthetic multi-language repo in $WORK"
 mkdir -p "$WORK/packages/core" "$WORK/packages/app" "$WORK/src"
 printf '{"name":"smoke-mono","private":true}\n' > "$WORK/package.json"
