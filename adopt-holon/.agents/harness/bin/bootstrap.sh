@@ -13,5 +13,8 @@ if [ -n "$swift_major" ] && [ "$swift_major" -lt 6 ]; then
 fi
 root="$(cd "$(dirname "$0")/.." && pwd)"
 export CLAUDE_PROJECT_DIR="$(cd "$root/../.." && pwd)"
+for dir in CATALOG DESIGN FINDINGS ISSUES MEMORIES PHASES PROPOSALS QUESTIONS RESULTS TASKS drafts; do
+    mkdir -p "$CLAUDE_PROJECT_DIR/.agents/records/$dir"
+done
 swift "$root/hooks/sync-settings.swift"
 "$root/bin/build.sh"

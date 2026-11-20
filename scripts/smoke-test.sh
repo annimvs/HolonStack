@@ -26,6 +26,11 @@ cd "$WORK"
 echo "==> 1. Bootstrap & wiring"
 .agents/harness/bin/bootstrap.sh
 .agents/harness/bin/sync-settings --check
+for src in .agents/harness/hooks/*.swift .agents/harness/tools/*.swift; do
+    name="$(basename "$src" .swift)"
+    [ -x ".agents/harness/.cache/bin/$name" ] || { echo "FAIL: $name did not compile" >&2; exit 1; }
+done
+.agents/harness/bin/filter-run 'echo "error: sample"' | grep -q "error: sample"
 
 echo "==> 2. Lint, check-docs, and write check"
 .agents/harness/bin/lint .agents/harness/hooks/*.swift .agents/harness/tools/*.swift
