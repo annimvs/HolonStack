@@ -74,7 +74,9 @@ struct Parser {
     var i = 0
     var line = 1
     var col = 1
-    init(_ text: String) { s = Array(text) }
+    init(_ text: String) {
+        s = Array(text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n"))
+    }
 
     /// Returns the character at the current position plus an offset, or nil past the end of the text.
     func peek(_ o: Int = 0) -> Character? { i + o < s.count ? s[i + o] : nil }

@@ -138,7 +138,9 @@ for d in drafts {
         try? FileManager.default.removeItem(atPath: d + ".escalate")
         continue
     }
-    let first = ((try? String(contentsOfFile: d, encoding: .utf8)) ?? "").components(separatedBy: "\n").first ?? ""
+    let rawDraft = ((try? String(contentsOfFile: d, encoding: .utf8)) ?? "")
+        .replacingOccurrences(of: "\r\n", with: "\n")
+    let first = rawDraft.components(separatedBy: "\n").first ?? ""
     if first.hasPrefix("// cannot fix:") {
         let rest = first.dropFirst("// cannot fix:".count)
         let parts = rest.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
