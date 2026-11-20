@@ -193,15 +193,16 @@ func expand(_ w: String) -> String {
     for v in ["${HOME}", "$HOME"] where w.hasPrefix(v) { return home + w.dropFirst(v.count) }
     return w
 }
-/// Standardizes `..` and `.` segments against the project root so traversal paths cannot match allowed prefixes.
-func normalizedPath(_ w: String) -> String {
+let startCwd = (rawInput["cwd"] as? String) ?? proj
+/// Standardizes `..` and `.` segments against `base` so traversal paths cannot match allowed prefixes.
+func normalizedPath(_ w: String, base: String = proj) -> String {
     let expanded = expand(w)
-    let abs = expanded.hasPrefix("/") ? expanded : proj + "/" + expanded
+    let abs = expanded.hasPrefix("/") ? expanded : base + "/" + expanded
     return URL(fileURLWithPath: abs).standardized.path
 }
 /// Build output and scratch: the only places a recursive delete may reach.
-func isDisposable(_ w: String) -> Bool {
-    let std = normalizedPath(w)
+func isDisposable(_ w: String, base: String = proj) -> Bool {
+    let std = normalizedPath(w, base: base)
     let buildDirs = [".build", "build", "builddir", "target", "dist", ".next", "__pycache__"]
     for dir in buildDirs {
         if std.hasSuffix("/" + dir) || std.contains("/" + dir + "/") { return true }
@@ -211,10 +212,10 @@ func isDisposable(_ w: String) -> Bool {
 }
 /// Checks whether a path is inside the project, the build output or the scratch folder, so a write there is allowed.
 /// Takes the path as written in the command; returns true when it is inside one of those places.
-func isInsideProject(_ w: String) -> Bool {
-    let std = normalizedPath(w)
-    return std.hasPrefix("/dev/") || isDisposable(w) || std == proj || std == realProjPath || std.hasPrefix(proj + "/")
-        || std.hasPrefix(realProjPath + "/")
+func isInsideProject(_ w: String, base: String = proj) -> Bool {
+    let std = normalizedPath(w, base: base)
+    return std.hasPrefix("/dev/") || isDisposable(w, base: base) || std == proj || std == realProjPath
+        || std.hasPrefix(proj + "/") || std.hasPrefix(realProjPath + "/")
 }
 let realProjPath = URL(fileURLWithPath: proj).resolvingSymlinksInPath().path
 /// Command prefixes that delegate execution to the following program word, mapped to flags that consume an argument.
@@ -246,8 +247,8 @@ func unwrapCommand(_ seg: [String]) -> (prog: String, args: [String], viaXargs: 
             skipNext = false
             continue
         }
-        if matches(#"^[0-9]*>>?"#, w) || w.hasPrefix("<") {
-            if w == "<" || w == "<<" || w == "<<-" || matches(#"^[0-9]*>>?$"#, w) { skipNext = true }
+        if matches(#"^[0-9]*>>?(&[0-9-]+)?$"#, w) || matches(#"^[0-9]*<<?-?(&[0-9-]+)?$"#, w) {
+            if matches(#"^[0-9]*(>>?|<<?-?)$"#, w) { skipNext = true }
             continue
         }
         tokens.append(w)
@@ -288,7 +289,38 @@ func unwrapCommand(_ seg: [String]) -> (prog: String, args: [String], viaXargs: 
     return nil
 }
 
-for seg in shellSegments(cmd) {
+/// Shells whose `-c` argument runs a nested command string.
+let nestedShells: Set<String> = ["sh", "bash", "zsh", "dash", "ksh", "fish"]
+
+/// Splits a command into simple commands and recursively expands `sh -c <script>` payloads up to `depth` 4.
+func expandedSegments(_ command: String, depth: Int = 0) -> [[String]] {
+    var out: [[String]] = []
+    for seg in shellSegments(command) {
+        out.append(seg)
+        guard depth < 4, let (prog, args, _) = unwrapCommand(seg), nestedShells.contains(prog) else { continue }
+        for i in args.indices where matches(#"^-[a-zA-Z]*c$"#, args[i]) {
+            if i + 1 < args.count { out += expandedSegments(args[i + 1], depth: depth + 1) }
+            break
+        }
+    }
+    return out
+}
+
+/// Updates `currentDir` when `seg` is a `cd` or `pushd` command so later segments resolve relative paths accurately.
+func updateCwd(_ seg: [String], currentDir: inout String) {
+    guard let (prog, args, _) = unwrapCommand(seg), prog == "cd" || prog == "pushd" else { return }
+    let target = args.first { !$0.hasPrefix("-") }
+    guard let target else {
+        currentDir = home
+        return
+    }
+    if target != "-" { currentDir = normalizedPath(target, base: currentDir) }
+}
+
+let allSegments = expandedSegments(cmd)
+var rmCwd = startCwd
+for seg in allSegments {
+    updateCwd(seg, currentDir: &rmCwd)
     guard let (prog, args, viaXargs) = unwrapCommand(seg), prog == "rm" else { continue }
     var flags: [String] = []
     var operands: [String] = []
@@ -303,12 +335,14 @@ for seg in shellSegments(cmd) {
     let recursive = flags.contains { matches(#"^-[a-zA-Z]*[rR][a-zA-Z]*$|^--recursive$"#, $0) }
     if recursive {
         if viaXargs { deny("recursive rm via xargs can delete outside .build/ and scratch") }
-        let bad = operands.filter { !isDisposable($0) }
+        let bad = operands.filter { !isDisposable($0, base: rmCwd) }
         if !bad.isEmpty { deny("recursive rm outside .build/ and scratch: \(bad.prefix(3).joined(separator: " "))") }
     }
 }
 // find -delete / -exec rm and scripting-language recursive deletes are the same thing spelled differently.
-for seg in shellSegments(cmd) {
+var findCwd = startCwd
+for seg in allSegments {
+    updateCwd(seg, currentDir: &findCwd)
     guard let (prog, args, _) = unwrapCommand(seg), prog == "find" else { continue }
     let hasExecRm = args.indices.contains { i in
         (args[i] == "-exec" || args[i] == "-execdir") && i + 1 < args.count
@@ -319,7 +353,7 @@ for seg in shellSegments(cmd) {
     let afterFlags = args.drop { leadFlags.contains($0) }
     let rawPaths = Array(afterFlags.prefix { !$0.hasPrefix("-") && $0 != "(" && $0 != "!" })
     let paths = rawPaths.isEmpty ? ["."] : rawPaths
-    let bad = paths.filter { !isDisposable($0) }
+    let bad = paths.filter { !isDisposable($0, base: findCwd) }
     if !bad.isEmpty {
         deny("find -delete/-exec rm outside .build/ and scratch: \(bad.prefix(3).joined(separator: " "))")
     }
@@ -510,8 +544,10 @@ func writeTargets(_ seg: [String]) -> [String] {
     }
     return out
 }
-for seg in shellSegments(cmd) {
-    if let t = writeTargets(seg).first(where: { matches(protectedPath, normalizedPath($0)) }) {
+var protectedCwd = startCwd
+for seg in allSegments {
+    updateCwd(seg, currentDir: &protectedCwd)
+    if let t = writeTargets(seg).first(where: { matches(protectedPath, normalizedPath($0, base: protectedCwd)) }) {
         deny(
             "\(t): the indexes, generated views and ledger change only through .agents/harness/bin/write, and the templates and reasons only by the user (rules/RECORDS.md)"
         )
@@ -561,14 +597,16 @@ func commandParts(_ seg: [String]) -> (prog: String, args: [String])? {
     guard let (prog, args, _) = unwrapCommand(seg) else { return nil }
     return (prog, args)
 }
-for seg in shellSegments(cmd) {
+var editCwd = startCwd
+for seg in allSegments {
+    updateCwd(seg, currentDir: &editCwd)
     guard let (prog, args) = commandParts(seg), prog == "edit", let file = editFileOperand(args) else { continue }
     let target = expand(file)
-    let stdTarget = normalizedPath(file)
+    let stdTarget = normalizedPath(file, base: editCwd)
     if matches(recordsPath, stdTarget) && !matches(draftsPath, stdTarget) {
         deny("\(target): records change through `write` or the Edit tool, which checks them; `edit` is for other files")
     }
-    if let reason = guardEditReason(for: target) { deny("edit \(target): \(reason)") }
+    if let reason = guardEditReason(for: stdTarget) { deny("edit \(target): \(reason)") }
 }
 
 // MARK: - Shell Edits Of Project Files
@@ -614,10 +652,9 @@ func overwrittenFiles(_ seg: [String]) -> [String] {
 }
 /// True when `word` names an existing regular file inside the project that the steering applies to: not build
 /// output, cache, `.git`, `node_modules`, `.agents/records/`, a log-like file, or `/dev/`.
-func isSteeredFile(_ word: String) -> Bool {
+func isSteeredFile(_ word: String, base: String) -> Bool {
     let written = expand(word)
     if written.hasPrefix("&") || written.hasPrefix("/dev/") { return false }
-    let base = (rawInput["cwd"] as? String) ?? FileManager.default.currentDirectoryPath
     let absolute = URL(fileURLWithPath: written.hasPrefix("/") ? written : base + "/" + written)
     let path = absolute.standardized.resolvingSymlinksInPath().path
     var isDirectory: ObjCBool = false
@@ -629,8 +666,10 @@ func isSteeredFile(_ word: String) -> Bool {
     return !loggedExtensions.contains(absolute.pathExtension)
 }
 if editGuardMode == "deny", environment["HOLON_ALLOW_BUILTIN_EDIT"] != "1" {
-    for seg in shellSegments(cmd) {
-        if let file = overwrittenFiles(seg).first(where: isSteeredFile) {
+    var steerCwd = startCwd
+    for seg in allSegments {
+        updateCwd(seg, currentDir: &steerCwd)
+        if let file = overwrittenFiles(seg).first(where: { isSteeredFile($0, base: steerCwd) }) {
             deny(
                 "\(file): a shell command would change this project file; use `.agents/harness/bin/edit FILE --old TEXT --new TEXT`"
                     + " (`--create` for a new file; see rules/EDITING.md)")

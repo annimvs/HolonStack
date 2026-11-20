@@ -41,7 +41,7 @@ let fileRe = try? NSRegularExpression(
 )
 let shellRe = try? NSRegularExpression(
     pattern:
-        #"(?:>>?\s*|tee\s+(?:-a\s+)?|bin/edit\s+(?:--[a-z-]+\s+\S+\s+)*)[^\s"';&|]*?(\.agents/records/drafts/[A-Za-z0-9._-]+\.closure)"#
+        #"(?:>>?\s*|tee\s+(?:-a\s+)?|bin/edit\s+(?:--[a-z-]+\s+\S+\s+)*|(?:cp|mv|install)\s+(?:-[a-zA-Z]+\s+)*[^\s"';&|]+\s+)[^\s"';&|]*?(\.agents/records/drafts/[A-Za-z0-9._-]+\.closure)"#
 )
 for line in text.split(separator: "\n") {
     let s = String(line)
