@@ -9,8 +9,7 @@ Which file owns what in `adopt-holon/`. Index: [ATLAS](../../ATLAS.md). Layers: 
 | File | Owns |
 |---|---|
 | `SKILL.md` | `/adopt-holon` skill entrypoint (YAML frontmatter and 6-step adoption workflow) |
-| `AGENTS.md` | Root agent-instructions stub copied into adopting repositories |
-| `CLAUDE.md`, `GEMINI.md` | Relative symlinks to `AGENTS.md` for Claude Code and Antigravity / Gemini |
+| `AGENTS.md` | Root agent-instructions stub copied into adopting repositories (`/adopt-holon` creates relative `CLAUDE.md` and `GEMINI.md` symlinks to it) |
 | `.agents/ATLAS.md` | Template map stub populated per adopting repository |
 | `.agents/codebase/` | Stub templates for `CODEBASE.md`, `LIFECYCLE.md`, and `maps/module-template.md` |
 | `.agents/reference/README.md` | Stub index for the adopting project's domain RFCs and specifications |

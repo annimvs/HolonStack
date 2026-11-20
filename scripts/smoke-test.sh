@@ -24,7 +24,8 @@ printf 'def hello(name):\n    return f"hi {name}"\n' > "$WORK/packages/core/help
 printf 'int main(int argc, char **argv) {\n  return 0;\n}\n' > "$WORK/src/main.c"
 
 cp -R "$REPO_ROOT/adopt-holon/.agents" "$WORK/"
-cp -P "$REPO_ROOT/adopt-holon/AGENTS.md" "$REPO_ROOT/adopt-holon/CLAUDE.md" "$REPO_ROOT/adopt-holon/GEMINI.md" "$WORK/"
+cp "$REPO_ROOT/adopt-holon/AGENTS.md" "$WORK/"
+(cd "$WORK" && ln -s AGENTS.md CLAUDE.md && ln -s AGENTS.md GEMINI.md)
 
 cd "$WORK"
 
