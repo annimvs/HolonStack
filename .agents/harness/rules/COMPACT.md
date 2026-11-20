@@ -34,6 +34,46 @@ Leave out what the code, the docs under `.agents/` or git already record ([remem
 2. When the summary lacks a detail you need, search the newest transcript in `.agents/harness/.cache/compactions/` with `grep` instead of guessing.
 3. File what the summary shows that has no record yet, using the table above.
 
+## Context reinjected block
+
+Hook context reaches the model only; the client does not show it to the user. Print one `### Context reinjected` block at the end of your reply on **exactly two triggers**, and on no other reply:
+
+1. **First reply after a compaction restart** (`[context-reinjected kind=compact ...]` is in context).
+2. **A reply after `route-semantics` loads a card not already in context** (`[context-reinjected kind=card ...]` is in context).
+
+This block is an explicit exception to [QUIET](QUIET.md) ("reply with only what is essential"): print it only on those two triggers, never when nothing was injected. Read the numbers from the `[context-reinjected ...]` line the hook added (hooks also append the same numbers to `.agents/harness/.cache/reinjections.jsonl`). Sizes are characters shown as `k` (`1k` = 1,000 chars; tokens are roughly `chars / 4`). Omit rows whose size is `0`, and use short names (`core`, `harness`, `pre-compact` instead of file extensions).
+
+**Compaction restart form** (include any cards loaded in the same turn):
+
+```markdown
+### Context reinjected
+Transcript **412k** → summary **3.1k** · reinjected **6.8k / 9k**
+
+| Source | Size | Why |
+|---|---|---|
+| `core` | 0.9k | always present |
+| `harness` | 0.7k | matched `pre-compact` |
+| `MEMORY.md` | 1.1k | records win over summary |
+| `OPEN.md` | 0.3k | 1 open question |
+| `TODO.md` | 0.2k | open work |
+| `<stamp>.md` | 412k | newest transcript; search, don't guess |
+
+- **In summary (agent's read, unverified):** goal, files mid-edit, last failure, rejected approaches
+- **In records:** record ids or counts referenced
+```
+
+The two footer bullets are the agent's own reading of the summary and are the least reliable part of the block; drop either bullet if you cannot name concrete items, and never invent counts.
+
+**Card-only form** (trigger 2, when no compaction just happened):
+
+```markdown
+### Context reinjected
+
+| Source | Size | Why |
+|---|---|---|
+| `harness` | 0.7k | matched `pre-compact` |
+```
+
 ## Compacting by hand
 
 `pre-compact` already gives these instructions on every compaction, so a bare `/compact` is enough. Add a focus only when this compaction needs something extra kept, for example (Claude Code also hands the focus to the hook as `custom_instructions`):
