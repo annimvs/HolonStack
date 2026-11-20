@@ -184,7 +184,7 @@ let rel = String(path.dropFirst(proj.count + "/.agents/".count))
 // Keep in step with check-edit.swift and guards.d/records-bash.json.
 let writerOwned: Set<String> = [
     "records/PLAN.closure", "records/TODO.closure", "records/MEMORY.md", "records/OPEN.md", "records/PLAN.md",
-    "records/TODO.md", "records/BUGS.md", "records/PROPOSALS.md", "records/SEMANTICS.md",
+    "records/TODO.md", "records/BUGS.md", "records/AUDIT.md", "records/PROPOSALS.md", "records/SEMANTICS.md",
 ]
 let userOnly: Set<String> = ["records/.ids", "records/.write.lock", "harness/reasons.closure", "harness/lint.closure"]
 
