@@ -217,13 +217,29 @@ func isInsideProject(_ w: String) -> Bool {
         || std.hasPrefix(realProjPath + "/")
 }
 let realProjPath = URL(fileURLWithPath: proj).resolvingSymlinksInPath().path
-/// Command prefixes that delegate execution to the following program word.
-let commandWrappers: Set<String> = ["command", "env", "sudo", "nohup", "time", "exec"]
+/// Command prefixes that delegate execution to the following program word, mapped to flags that consume an argument.
+let wrapperValueFlags: [String: Set<String>] = [
+    "sudo": ["-u", "-g", "-C", "-D", "-h", "-p", "-r", "-t", "-T", "-U"],
+    "doas": ["-u", "-C"],
+    "env": ["-u", "-C", "-S", "--unset", "--chdir", "--split-string"],
+    "nice": ["-n", "--adjustment"],
+    "xargs": [
+        "-I", "-L", "-n", "-P", "-d", "-E", "-s", "-J", "-R", "-a",
+        "--arg-file", "--delimiter", "--eof", "--replace", "--max-lines", "--max-args", "--max-procs", "--max-chars",
+    ],
+    "timeout": ["-k", "-s", "--kill-after", "--signal"],
+    "exec": ["-a"],
+    "ionice": ["-c", "-n", "-p"],
+    "stdbuf": ["-i", "-o", "-e"],
+    "caffeinate": ["-t", "-w"],
+    "command": [], "nohup": [], "time": [], "chrt": [],
+]
 
-for seg in shellSegments(cmd) {
-    var operands: [String] = []
-    var flags: [String] = []
-    var cmdWord: String?
+/// Strips redirects, leading `VAR=val` assignments, and command wrappers (with their option arguments) from a segment.
+/// Returns the invoked program basename, its remaining arguments, and whether `xargs` feeds operands on stdin.
+// lint-ignore: func-length: single pass unwrapping redirects, assignments, and chained command wrappers
+func unwrapCommand(_ seg: [String]) -> (prog: String, args: [String], viaXargs: Bool)? {
+    var tokens: [String] = []
     var skipNext = false
     for w in seg {
         if skipNext {
@@ -234,44 +250,66 @@ for seg in shellSegments(cmd) {
             if w == "<" || w == "<<" || w == "<<-" || matches(#"^[0-9]*>>?$"#, w) { skipNext = true }
             continue
         }
-        if cmdWord == nil {
-            if w.contains("="), !w.hasPrefix("-"), !w.hasPrefix("/") { continue }
-            if w.hasPrefix("-") || commandWrappers.contains((w as NSString).lastPathComponent) { continue }
-            cmdWord = w
+        tokens.append(w)
+    }
+    var i = 0
+    var viaXargs = false
+    while i < tokens.count {
+        let w = tokens[i]
+        if w.contains("="), !w.hasPrefix("-"), !w.hasPrefix("/") {
+            i += 1
             continue
         }
-        if w.hasPrefix("-") { flags.append(w) } else { operands.append(w) }
+        let base = (w as NSString).lastPathComponent
+        guard let valFlags = wrapperValueFlags[base] else {
+            return (base, Array(tokens[(i + 1)...]), viaXargs)
+        }
+        if base == "xargs" { viaXargs = true }
+        i += 1
+        while i < tokens.count {
+            let opt = tokens[i]
+            if opt == "--" {
+                i += 1
+                break
+            }
+            if base == "env", opt.contains("="), !opt.hasPrefix("-"), !opt.hasPrefix("/") {
+                i += 1
+                continue
+            }
+            if opt.hasPrefix("-") {
+                i += 1
+                if valFlags.contains(opt), i < tokens.count { i += 1 }
+                continue
+            }
+            if base == "timeout" || base == "chrt" { i += 1 }
+            break
+        }
     }
-    guard let cmdWord, (cmdWord as NSString).lastPathComponent == "rm" else { continue }
+    return nil
+}
+
+for seg in shellSegments(cmd) {
+    guard let (prog, args, viaXargs) = unwrapCommand(seg), prog == "rm" else { continue }
+    var flags: [String] = []
+    var operands: [String] = []
+    var afterDash = false
+    for w in args {
+        if !afterDash, w == "--" {
+            afterDash = true
+            continue
+        }
+        if !afterDash, w.hasPrefix("-") { flags.append(w) } else { operands.append(w) }
+    }
     let recursive = flags.contains { matches(#"^-[a-zA-Z]*[rR][a-zA-Z]*$|^--recursive$"#, $0) }
     if recursive {
+        if viaXargs { deny("recursive rm via xargs can delete outside .build/ and scratch") }
         let bad = operands.filter { !isDisposable($0) }
         if !bad.isEmpty { deny("recursive rm outside .build/ and scratch: \(bad.prefix(3).joined(separator: " "))") }
     }
 }
 // find -delete / -exec rm and scripting-language recursive deletes are the same thing spelled differently.
 for seg in shellSegments(cmd) {
-    var args: [String] = []
-    var cmdWord: String?
-    var skipNext = false
-    for w in seg {
-        if skipNext {
-            skipNext = false
-            continue
-        }
-        if matches(#"^[0-9]*>>?"#, w) || w.hasPrefix("<") {
-            if w == "<" || w == "<<" || w == "<<-" || matches(#"^[0-9]*>>?$"#, w) { skipNext = true }
-            continue
-        }
-        if cmdWord == nil {
-            if w.contains("="), !w.hasPrefix("-"), !w.hasPrefix("/") { continue }
-            if w.hasPrefix("-") || commandWrappers.contains((w as NSString).lastPathComponent) { continue }
-            cmdWord = w
-            continue
-        }
-        args.append(w)
-    }
-    guard let cmdWord, (cmdWord as NSString).lastPathComponent == "find" else { continue }
+    guard let (prog, args, _) = unwrapCommand(seg), prog == "find" else { continue }
     let hasExecRm = args.indices.contains { i in
         (args[i] == "-exec" || args[i] == "-execdir") && i + 1 < args.count
             && (args[i + 1] as NSString).lastPathComponent == "rm"
@@ -416,8 +454,6 @@ func editFileOperand(_ words: [String]) -> String? {
 // lint-ignore: func-length: kept whole so its steps read in order; split it when it grows
 func writeTargets(_ seg: [String]) -> [String] {
     var out: [String] = []
-    var plain: [String] = []
-    var cmdIdx: Int?
     var j = 0
     while j < seg.count {
         let w = seg[j]
@@ -429,20 +465,10 @@ func writeTargets(_ seg: [String]) -> [String] {
                 out.append(seg[j + 1])
                 j += 1
             }
-        } else if w.hasPrefix("<") {
-            if w == "<" || w == "<<" || w == "<<-" { j += 1 }
-        } else if cmdIdx == nil {
-            let base = (w as NSString).lastPathComponent
-            if (!w.contains("=") || w.hasPrefix("/")) && !w.hasPrefix("-") && !commandWrappers.contains(base) {
-                cmdIdx = j
-            }
-        } else {
-            plain.append(w)
         }
         j += 1
     }
-    guard let ci = cmdIdx else { return out }
-    let prog = (seg[ci] as NSString).lastPathComponent
+    guard let (prog, plain, _) = unwrapCommand(seg) else { return out }
     let operands = plain.filter { !$0.hasPrefix("-") }
     switch prog {
     case "rm", "mv", "truncate", "tee": out += operands
@@ -530,29 +556,10 @@ func guardEditReason(for file: String) -> String? {
     guard process.terminationStatus == 2 else { return nil }
     return String(decoding: reason, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }
-/// Extracts the command basename and non-redirect arguments from a segment, skipping leading `VAR=val` and redirects.
+/// Extracts the command basename and non-redirect arguments from a segment, skipping leading `VAR=val`, wrappers and redirects.
 func commandParts(_ seg: [String]) -> (prog: String, args: [String])? {
-    var cmdWord: String?
-    var args: [String] = []
-    var j = 0
-    while j < seg.count {
-        let w = seg[j]
-        if let r = w.range(of: redirect, options: .regularExpression) {
-            if w[r.upperBound...].isEmpty, j + 1 < seg.count { j += 1 }
-        } else if w.hasPrefix("<") {
-            if w == "<" || w == "<<" || w == "<<-" { j += 1 }
-        } else if cmdWord == nil {
-            let base = (w as NSString).lastPathComponent
-            if (!w.contains("=") || w.hasPrefix("/")) && !w.hasPrefix("-") && !commandWrappers.contains(base) {
-                cmdWord = w
-            }
-        } else {
-            args.append(w)
-        }
-        j += 1
-    }
-    guard let cmdWord else { return nil }
-    return ((cmdWord as NSString).lastPathComponent, args)
+    guard let (prog, args, _) = unwrapCommand(seg) else { return nil }
+    return (prog, args)
 }
 for seg in shellSegments(cmd) {
     guard let (prog, args) = commandParts(seg), prog == "edit", let file = editFileOperand(args) else { continue }
