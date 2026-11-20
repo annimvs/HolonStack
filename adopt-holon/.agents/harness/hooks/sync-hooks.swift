@@ -15,15 +15,58 @@ func entryPoint(_ script: String) -> String {
     return "bin/" + String((script as NSString).lastPathComponent.dropLast(".swift".count))
 }
 
+/// True when a Claude hook handler dictionary invokes a script under `.agents/harness/`.
+func isHarnessHandler(_ handler: Any) -> Bool {
+    guard let dict = handler as? [String: Any], let cmd = dict["command"] as? String else { return false }
+    return cmd.contains("/.agents/harness/")
+}
+
+/// Keeps non-harness entries from an existing `.claude/settings.json` `"hooks"` map and merges `wanted` harness entries.
+func mergeClaudeHooks(existing: [String: Any], wanted: [String: Any]) -> [String: Any] {
+    var merged: [String: [Any]] = [:]
+    for (event, rawEntries) in existing {
+        guard let entries = rawEntries as? [Any] else { continue }
+        var kept: [Any] = []
+        for entry in entries {
+            guard var dict = entry as? [String: Any], let handlers = dict["hooks"] as? [Any] else {
+                kept.append(entry)
+                continue
+            }
+            let userHandlers = handlers.filter { !isHarnessHandler($0) }
+            if !userHandlers.isEmpty {
+                dict["hooks"] = userHandlers
+                kept.append(dict)
+            }
+        }
+        if !kept.isEmpty { merged[event] = kept }
+    }
+    for (event, rawEntries) in wanted {
+        guard let entries = rawEntries as? [Any] else { continue }
+        merged[event] = entries + (merged[event] ?? [])
+    }
+    return merged
+}
+
 /// Checks whether a JSON dictionary on disk matches `wanted`, or writes `wanted` when not in `--check` mode.
-/// When `mergeTopLevel` is true, existing top-level keys outside `wanted` (such as `permissions` in `.claude/settings.json`) are preserved.
-func syncJSON(file: URL, wanted: NSDictionary, label: String, stale: inout Bool, mergeTopLevel: Bool = false) throws {
+/// When `mergeTopLevel` is true, existing top-level keys outside `wanted` are preserved; when `mergeHooks` is true,
+/// non-harness entries inside `"hooks"` are preserved alongside the generated harness hooks.
+func syncJSON(
+    file: URL, wanted: NSDictionary, label: String, stale: inout Bool,
+    mergeTopLevel: Bool = false, mergeHooks: Bool = false
+) throws {
     var target: [String: Any] = (wanted as? [String: Any]) ?? [:]
     if mergeTopLevel,
         let existingData = try? Data(contentsOf: file),
         var existing = (try? JSONSerialization.jsonObject(with: existingData)) as? [String: Any]
     {
-        for (k, v) in target { existing[k] = v }
+        for (k, v) in target {
+            if mergeHooks, k == "hooks", let exHooks = existing[k] as? [String: Any], let newHooks = v as? [String: Any]
+            {
+                existing[k] = mergeClaudeHooks(existing: exHooks, wanted: newHooks)
+            } else {
+                existing[k] = v
+            }
+        }
         target = existing
     }
     let finalWanted = target as NSDictionary
@@ -116,9 +159,9 @@ if (try? fm.destinationOfSymbolicLink(atPath: proj.appendingPathComponent(".clau
 var stale = false
 try syncJSON(
     file: proj.appendingPathComponent(".claude/settings.json"), wanted: claudeWanted(events: events),
-    label: ".claude/settings.json", stale: &stale, mergeTopLevel: true)
+    label: ".claude/settings.json", stale: &stale, mergeTopLevel: true, mergeHooks: true)
 try syncJSON(
     file: proj.appendingPathComponent(".agents/hooks.json"), wanted: geminiWanted(events: events),
-    label: ".agents/hooks.json", stale: &stale)
+    label: ".agents/hooks.json", stale: &stale, mergeTopLevel: true)
 
 exit(stale ? 1 : 0)
