@@ -22,9 +22,7 @@ else {
     exit(0)
 }
 let path = URL(fileURLWithPath: file).resolvingSymlinksInPath().path
-// Swift under .agents/harness/ is linted on save; every finding is sent back.
-// ADOPTION NOTE (/adopt-holon): Add a matching post-edit lint branch here if the adopting project uses a language-specific
-// linter/formatter (clang-tidy, eslint, biome, clippy, golangci-lint, etc.) on its source files.
+// Swift under .agents/harness/ is linted on save; every finding is sent back. conformance/ and Sources/ keep their own style.
 if path.hasSuffix(".swift"), path.hasPrefix(proj + "/.agents/harness/"),
     FileManager.default.fileExists(atPath: proj + "/.agents/harness/bin/lint")
 {
@@ -42,14 +40,20 @@ if path.hasSuffix(".swift"), path.hasPrefix(proj + "/.agents/harness/"),
         p.waitUntilExit()
         if p.terminationStatus != 0 {
             let errors = String(decoding: d, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-            FileHandle.standardError.write(
-                Data(
-                    "lint (\(path.dropFirst(proj.count + 1))):\n\(errors)\nfix each finding above, or add `// lint-ignore: <rule-id>: <why>`\n"
-                        .utf8))
+            let message =
+                "lint (\(path.dropFirst(proj.count + 1))):\n\(errors)\nfix each finding above, or add `// lint-ignore: <rule-id>: <why>`\n"
             if isGemini {
-                print("{}")
+                if let data = try? JSONSerialization.data(
+                    withJSONObject: ["systemMessage": message], options: [.sortedKeys])
+                {
+                    FileHandle.standardOutput.write(data)
+                    print()
+                } else {
+                    print("{}")
+                }
                 exit(0)
             }
+            FileHandle.standardError.write(Data(message.utf8))
             exit(2)
         }
     }
@@ -62,7 +66,8 @@ let rel = String(path.dropFirst(proj.count + "/.agents/".count))
 
 // record folders; keep in step with the templates' `// store:` lines and guard-edit.swift
 let folders = [
-    "PHASES/", "TASKS/", "MEMORIES/", "QUESTIONS/", "ISSUES/", "PROPOSALS/", "CATALOG/", "DESIGN/", "RESULTS/",
+    "PHASES/", "TASKS/", "MEMORIES/", "QUESTIONS/", "ISSUES/", "AUDITS/", "PROPOSALS/", "FINDINGS/", "CATALOG/",
+    "DESIGN/", "SEMANTICS/", "RESULTS/", "INTERFACES/",
 ].map { "records/" + $0 }
 
 /// Runs a command through `/usr/bin/env` in the project folder and returns its exit status and trimmed output.
@@ -116,11 +121,17 @@ if rel.hasPrefix("records/drafts/"), rel.hasSuffix(".closure"), FileManager.defa
     }
 }
 if !findings.isEmpty {
-    FileHandle.standardError.write(Data("check-edit (\(rel)):\n\(findings)\n".utf8))
+    let message = "check-edit (\(rel)):\n\(findings)\n"
     if isGemini {
-        print("{}")
+        if let data = try? JSONSerialization.data(withJSONObject: ["systemMessage": message], options: [.sortedKeys]) {
+            FileHandle.standardOutput.write(data)
+            print()
+        } else {
+            print("{}")
+        }
         exit(0)
     }
+    FileHandle.standardError.write(Data(message.utf8))
     exit(2)
 }
 if isGemini { print("{}") }

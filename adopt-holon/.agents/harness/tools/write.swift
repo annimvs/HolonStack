@@ -167,12 +167,20 @@ struct Parser {
         }
         var lines = raw.components(separatedBy: "\n")
         if let f = lines.first, f.trimmingCharacters(in: .whitespaces).isEmpty { lines.removeFirst() }
-        if let l = lines.last, l.trimmingCharacters(in: .whitespaces).isEmpty { lines.removeLast() }
+        var closingIndent = 0
+        if let l = lines.last, l.trimmingCharacters(in: .whitespaces).isEmpty {
+            closingIndent = l.prefix(while: { $0 == " " }).count
+            lines.removeLast()
+        }
         let indents = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.map { line in
             line.prefix(while: { $0 == " " }).count
         }
-        let m = indents.min() ?? 0
-        return lines.map { $0.count >= m ? String($0.dropFirst(m)) : "" }.joined(separator: "\n")
+        let minIndent = indents.min() ?? 0
+        let m = (closingIndent > 0 && (indents.isEmpty || minIndent >= closingIndent)) ? closingIndent : minIndent
+        return lines.map { line in
+            let drop = min(m, line.prefix(while: { $0 == " " }).count)
+            return String(line.dropFirst(drop))
+        }.joined(separator: "\n")
     }
 
     /// Reads one value: a quoted string, a [ ] list, a { } block, a call, or a bare word.
@@ -568,7 +576,7 @@ struct Checker {
                 return
             }
             if mode == .draft {
-                if a != "_", !(path.hasPrefix("plan.phases[") && path.hasSuffix("(arg)") && !isID(a)) {
+                if a != "_", !(matches(path, #"^plan\.phases\[[0-9]+\]\(arg\)$"#) && !isID(a)) {
                     err(line, path, "write _ here; the tool generates ids")
                 }
             } else if !isID(a) {
@@ -859,7 +867,7 @@ final class Filler {
         for (i, ta) in tf.args.enumerated() {
             if case .form(let p) = ta, p.head == "id" {
                 let id = newID()
-                if i < rec.args.count, let label = atomOf(rec.args[i]), label != "_", !isID(label) {
+                if kind == "phase", i < rec.args.count, let label = atomOf(rec.args[i]), label != "_", !isID(label) {
                     labels[label] = id
                 }
                 args.append(.atom(id))
@@ -941,6 +949,7 @@ final class Filler {
             pending.append((k, stored))
             return .atom(idOf(stored) ?? "")
         }
+        if tf.head == "grok", let s = strOf(item) { return .str(joinLines(s)) }
         if ["ref", "grok", "text", "enum", "duration", "score", "detect"].contains(tf.head) { return item }
         if case .form(let rf) = item { return .form(fillForm(rf, tf, tf.head)) }
         return item
@@ -1422,15 +1431,8 @@ func fileRecord(_ store: Store, kind: String, template t: Template, draft: Form)
             throw Err(msg: "\(rel) already exists; edit that \(k) or give this one a different name")
         }
     }
-    for (k, f) in batch {
-        let rel = try store.path(store.templates[k]!, f)
-        try writeFile(store.url(rel), canonical(f))
-        written.append(rel)
-    }
-    try String((store.ledger() + filler.minted).map { $0 + "\n" }.joined()).write(
-        to: store.url(".ids"), atomically: true, encoding: .utf8)
-    // indexes
-    func append(_ file: String, _ idxKind: String, _ fieldName: String, _ id: String) throws {
+    // prepare any index update before writing records or .ids, so a missing/malformed index leaves nothing orphaned
+    func prepareAppend(_ file: String, _ idxKind: String, _ fieldName: String, _ id: String) throws -> (URL, String) {
         var f: Form
         if FileManager.default.fileExists(atPath: store.url(file).path) {
             f = try store.load(store.url(file))
@@ -1446,10 +1448,19 @@ func fileRecord(_ store: Store, kind: String, template t: Template, draft: Form)
         l.append(.atom(id))
         body[i].value = .list(l)
         f.body = body
-        try writeFile(store.url(file), canonical(f))
+        return (store.url(file), canonical(f))
     }
-    if kind == "phase" { try append("PLAN.closure", "plan", "phases", idOf(root) ?? "") }
-    if kind == "task" { try append("TODO.closure", "todo", "tasks", idOf(root) ?? "") }
+    var pendingIndex: (URL, String)?
+    if kind == "phase" { pendingIndex = try prepareAppend("PLAN.closure", "plan", "phases", idOf(root) ?? "") }
+    if kind == "task" { pendingIndex = try prepareAppend("TODO.closure", "todo", "tasks", idOf(root) ?? "") }
+    for (k, f) in batch {
+        let rel = try store.path(store.templates[k]!, f)
+        try writeFile(store.url(rel), canonical(f))
+        written.append(rel)
+    }
+    try String((store.ledger() + filler.minted).map { $0 + "\n" }.joined()).write(
+        to: store.url(".ids"), atomically: true, encoding: .utf8)
+    if let (idxURL, idxText) = pendingIndex { try writeFile(idxURL, idxText) }
     try render(store)
     return (filler.minted, written)
 }
@@ -1618,7 +1629,7 @@ func run() throws -> Int32 {
             }
             let tried = listOf(field(f, "tried"))
             var d: [String: Any] = [
-                "escalation": "records/drafts/" + u.lastPathComponent, "draft": strOf(field(f, "draft")) ?? "",
+                "escalation": ".agents/records/drafts/" + u.lastPathComponent, "draft": strOf(field(f, "draft")) ?? "",
                 "reason": atomOf(field(f, "reason")) ?? "", "route": atomOf(field(f, "route")) ?? "", "tried": tried,
             ]
             if let q = atomOf(field(f, "question")) { d["question"] = q }
@@ -1656,107 +1667,108 @@ func run() throws -> Int32 {
             print("still failing, and no escalation is open for it")
             return 1
         }
-        guard FileManager.default.fileExists(atPath: escURL.path) else {
-            throw Err(msg: "no escalation for \(draftURL.lastPathComponent)")
-        }
-        var esc = try parseRecord(String(contentsOf: escURL, encoding: .utf8))
-        switch args[1] {
-        case "resolve":
-            let (_, errs) = checkDraft(try String(contentsOf: draftURL, encoding: .utf8), store, kind: nil)
-            if !errs.isEmpty {
-                errs.forEach { print($0) }
-                print("still failing; the escalation stays")
-                return 1
+        return try withLock(store) {
+            guard FileManager.default.fileExists(atPath: escURL.path) else {
+                throw Err(msg: "no escalation for \(draftURL.lastPathComponent)")
             }
-            try FileManager.default.removeItem(at: escURL)
-            envelope("ok", "resolved", ["draft": draftURL.lastPathComponent])
-            return 0
-        case "bump":
-            guard args.count >= 3, tiers.contains(args[2]) else {
-                throw Err(msg: "usage: write escalation <draft> bump <\(tiers.joined(separator: "|"))>")
-            }
-            var tried = listOf(field(esc, "tried"))
-            if !tried.contains(args[2]) { tried.append(args[2]) }
-            setField(&esc, "tried", .list(tried.map { .atom($0) }))
-            if tiers.allSatisfy(tried.contains) {
-                setField(&esc, "route", .atom("user"))
-                setField(
-                    &esc, "note",
-                    .str(
-                        ((strOf(field(esc, "note")) ?? "") + " (\(tiers.joined(separator: " and ")) could not fix it)")
-                            .trimmingCharacters(in: .whitespaces)))
-            }
-            try writeFile(escURL, canonical(esc))
-            let next = atomOf(field(esc, "route")) == "model" ? tiers.first(where: { !tried.contains($0) }) : nil
-            envelope("ok", "tried \(args[2])", ["route": atomOf(field(esc, "route")) ?? "", "next": next ?? NSNull()])
-            return 0
-        case "ask":
-            if let q = atomOf(field(esc, "question")) {
-                envelope("ok", "already asked", ["question": q])
-                return 0
-            }
-            if let i = atomOf(field(esc, "issue")) {
-                envelope("ok", "already reported", ["issue": i])
-                return 0
-            }
-            let stem = draftURL.deletingPathExtension().lastPathComponent
-            let code = atomOf(field(esc, "reason")) ?? "none"
-            let meaning = reasonMeaning(store, code) ?? "the draft still fails after the agents tried to fix it"
-            let rel = draftURL.path.replacingOccurrences(
-                of: store.root.deletingLastPathComponent().path + "/", with: "")
-            let context =
-                "Draft: \(rel)\nReason: \(code), route \(atomOf(field(esc, "route")) ?? "?")\nNote: \(strOf(field(esc, "note")) ?? "")\nChecker:\n\(strOf(field(esc, "checker")) ?? "")"
-            // a harness route is a bug in the tool or a template: report it as an issue (BUGS.md) when that kind exists
-            if atomOf(field(esc, "route")) == "harness", let it = store.templates["issue"] {
-                let issue = Form(
-                    head: "issue", args: [.atom("_")],
-                    body: [
-                        Field(key: "name", value: .str("Harness rejects draft \(stem)"), line: 0),
-                        Field(key: "area", value: .str("writer or templates"), line: 0),
-                        Field(key: "status", value: .atom("open"), line: 0),
-                        Field(key: "repro", value: .str("\(meaning).\n\(context)"), line: 0),
-                    ], line: 0)
-                var ci = Checker(templates: store.templates, known: store.known(), mode: .draft)
-                ci.value(.form(issue), .form(it.form), "", 0)
-                if !ci.errs.isEmpty {
-                    ci.errs.forEach { print($0) }
-                    print("internal: the issue draft fails its template")
-                    return 2
+            var esc = try parseRecord(String(contentsOf: escURL, encoding: .utf8))
+            switch args[1] {
+            case "resolve":
+                let (_, errs) = checkDraft(try String(contentsOf: draftURL, encoding: .utf8), store, kind: nil)
+                if !errs.isEmpty {
+                    errs.forEach { print($0) }
+                    print("still failing; the escalation stays")
+                    return 1
                 }
-                return try withLock(store) {
+                try FileManager.default.removeItem(at: escURL)
+                envelope("ok", "resolved", ["draft": draftURL.lastPathComponent])
+                return 0
+            case "bump":
+                guard args.count >= 3, tiers.contains(args[2]) else {
+                    throw Err(msg: "usage: write escalation <draft> bump <\(tiers.joined(separator: "|"))>")
+                }
+                var tried = listOf(field(esc, "tried"))
+                if !tried.contains(args[2]) { tried.append(args[2]) }
+                setField(&esc, "tried", .list(tried.map { .atom($0) }))
+                let exhaustedNote = "(\(tiers.joined(separator: " and ")) could not fix it)"
+                if atomOf(field(esc, "route")) == "model", tiers.allSatisfy(tried.contains) {
+                    setField(&esc, "route", .atom("user"))
+                    let curNote = strOf(field(esc, "note")) ?? ""
+                    if !curNote.contains(exhaustedNote) {
+                        setField(
+                            &esc, "note", .str((curNote + " " + exhaustedNote).trimmingCharacters(in: .whitespaces)))
+                    }
+                }
+                try writeFile(escURL, canonical(esc))
+                let next = atomOf(field(esc, "route")) == "model" ? tiers.first(where: { !tried.contains($0) }) : nil
+                envelope(
+                    "ok", "tried \(args[2])", ["route": atomOf(field(esc, "route")) ?? "", "next": next ?? NSNull()])
+                return 0
+            case "ask":
+                if let q = atomOf(field(esc, "question")) {
+                    envelope("ok", "already asked", ["question": q])
+                    return 0
+                }
+                if let i = atomOf(field(esc, "issue")) {
+                    envelope("ok", "already reported", ["issue": i])
+                    return 0
+                }
+                let stem = draftURL.deletingPathExtension().lastPathComponent
+                let code = atomOf(field(esc, "reason")) ?? "none"
+                let meaning = reasonMeaning(store, code) ?? "the draft still fails after the agents tried to fix it"
+                let rel = draftURL.path.replacingOccurrences(
+                    of: store.root.deletingLastPathComponent().path + "/", with: "")
+                let context =
+                    "Draft: \(rel)\nReason: \(code), route \(atomOf(field(esc, "route")) ?? "?")\nNote: \(strOf(field(esc, "note")) ?? "")\nChecker:\n\(strOf(field(esc, "checker")) ?? "")"
+                // a harness route is a bug in the tool or a template: report it as an issue (BUGS.md) when that kind exists
+                if atomOf(field(esc, "route")) == "harness", let it = store.templates["issue"] {
+                    let issue = Form(
+                        head: "issue", args: [.atom("_")],
+                        body: [
+                            Field(key: "name", value: .str("Harness rejects draft \(stem)"), line: 0),
+                            Field(key: "area", value: .str("writer or templates"), line: 0),
+                            Field(key: "status", value: .atom("open"), line: 0),
+                            Field(key: "repro", value: .str("\(meaning).\n\(context)"), line: 0),
+                        ], line: 0)
+                    var ci = Checker(templates: store.templates, known: store.known(), mode: .draft)
+                    ci.value(.form(issue), .form(it.form), "", 0)
+                    if !ci.errs.isEmpty {
+                        ci.errs.forEach { print($0) }
+                        print("internal: the issue draft fails its template")
+                        return 2
+                    }
                     let (minted, written) = try fileRecord(store, kind: "issue", template: it, draft: issue)
                     if let id = minted.last { setField(&esc, "issue", .atom(id)) }
                     try writeFile(escURL, canonical(esc))
                     envelope("ok", "reported", ["issue": minted.last ?? "", "files": written])
                     return 0
                 }
-            }
-            guard let qt = store.templates["question"] else { throw Err(msg: "no question template") }
-            let q = Form(
-                head: "question", args: [.atom("_")],
-                body: [
-                    Field(key: "name", value: .str("Escalated draft \(stem)"), line: 0),
-                    Field(
-                        key: "ask", value: .str("How should draft \(stem) be fixed? Reason given: \(meaning)."), line: 0
-                    ),
-                    Field(key: "context", value: .str(context), line: 0),
-                    Field(key: "status", value: .atom("open"), line: 0),
-                ], line: 0)
-            var c = Checker(templates: store.templates, known: store.known(), mode: .draft)
-            c.value(.form(q), .form(qt.form), "", 0)
-            if !c.errs.isEmpty {
-                c.errs.forEach { print($0) }
-                print("internal: the question draft fails its template")
-                return 2
-            }
-            return try withLock(store) {
+                guard let qt = store.templates["question"] else { throw Err(msg: "no question template") }
+                let q = Form(
+                    head: "question", args: [.atom("_")],
+                    body: [
+                        Field(key: "name", value: .str("Escalated draft \(stem)"), line: 0),
+                        Field(
+                            key: "ask", value: .str("How should draft \(stem) be fixed? Reason given: \(meaning)."),
+                            line: 0
+                        ),
+                        Field(key: "context", value: .str(context), line: 0),
+                        Field(key: "status", value: .atom("open"), line: 0),
+                    ], line: 0)
+                var c = Checker(templates: store.templates, known: store.known(), mode: .draft)
+                c.value(.form(q), .form(qt.form), "", 0)
+                if !c.errs.isEmpty {
+                    c.errs.forEach { print($0) }
+                    print("internal: the question draft fails its template")
+                    return 2
+                }
                 let (minted, written) = try fileRecord(store, kind: "question", template: qt, draft: q)
                 if let id = minted.last { setField(&esc, "question", .atom(id)) }
                 try writeFile(escURL, canonical(esc))
                 envelope("ok", "asked", ["question": minted.last ?? "", "files": written])
                 return 0
+            default: throw Err(msg: "unknown escalation command '\(args[1])'")
             }
-        default: throw Err(msg: "unknown escalation command '\(args[1])'")
         }
 
     case "check":
@@ -1772,13 +1784,15 @@ func run() throws -> Int32 {
         let files = fix ? Array(args.dropFirst()) : args
         guard !files.isEmpty else { throw Err(msg: "usage: write lint [--fix] <file…>") }
         var bad = 0
-        for a in files {
+        /// Checks (and optionally rewrites) one file; when `fix` is true, runs inside `.write.lock` so read-parse-write is atomic.
+        func lintOne(_ a: String) throws {
             let text = try String(contentsOfFile: a, encoding: .utf8)
             do {
                 let f = try parseRecord(text)
                 // only records must be exactly what the writer emits; templates, test fixtures and config like reasons.closure
                 // (a head that is no record kind) keep their hand-written layout and comments
-                if store.templates[f.head] != nil, !a.contains("/templates/"), !a.contains("/tests/"),
+                let resolved = URL(fileURLWithPath: a).standardizedFileURL.path
+                if store.templates[f.head] != nil, !resolved.contains("/templates/"), !resolved.contains("/tests/"),
                     canonical(f) != text
                 {
                     if fix {
@@ -1793,6 +1807,11 @@ func run() throws -> Int32 {
                 print("\(a):\(x.line):\(x.col): \(x.msg)")
                 bad += 1
             }
+        }
+        if fix {
+            try withLock(store) { for a in files { try lintOne(a) } }
+        } else {
+            for a in files { try lintOne(a) }
         }
         print(bad == 0 ? "ok: \(files.count) file(s)" : "\(bad) problem(s)")
         return bad == 0 ? 0 : 1
@@ -1851,7 +1870,7 @@ func run() throws -> Int32 {
                     }
                     try writeFile(u, canonical(nf))
                     try render(store)  // PLAN.md shows the new checkbox
-                    // Nothing is committed: commits are the user's. The criteria evidence is reported instead.
+                    // Nothing is committed: commits in HolonShell are the user's. The criteria evidence is reported instead.
                     _ = wasDone
                     envelope("ok", "\(cmd) \(id)", ["file": u.lastPathComponent, "evidence": evidence])
                     return 0
@@ -2002,11 +2021,17 @@ func run() throws -> Int32 {
         // worker results the user has not been told about, as markdown; nothing printed when there is nothing new
         let peek = args.contains("--peek")
         let seenURL = store.url(".status-seen")
-        let seen = Set(
-            ((try? String(contentsOf: seenURL, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init))
-        let (text, keys) = renderStatus(store, seen: seen)
-        print(text, terminator: "")
-        if !peek, !keys.isEmpty { try writeFile(seenURL, (seen.union(keys)).sorted().joined(separator: "\n") + "\n") }
+        /// Reads unread results and marks them seen unless `--peek` is set.
+        func runStatus() throws {
+            let seen = Set(
+                ((try? String(contentsOf: seenURL, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init))
+            let (text, keys) = renderStatus(store, seen: seen)
+            print(text, terminator: "")
+            if !peek, !keys.isEmpty {
+                try writeFile(seenURL, (seen.union(keys)).sorted().joined(separator: "\n") + "\n")
+            }
+        }
+        if peek { try runStatus() } else { try withLock(store, runStatus) }
         return 0
 
     case "skeleton":
@@ -2094,14 +2119,14 @@ func setDone(_ v: inout Value, _ id: String, _ val: String) -> Bool {
 // MARK: - mutations (set, link, unlink, move, del)
 
 /// Parses a CLI argument into a closure Value, falling back to a quoted string when raw text has spaces or fails to parse.
-func parseCLIValue(_ raw: String, expectsString: Bool) throws -> Value {
+func parseCLIValue(_ raw: String, expectsString: Bool, collapseLines: Bool = true) throws -> Value {
     if expectsString {
         var p = Parser(raw)
         if let v = try? p.value() {
             p.skip()
-            if p.i == p.s.count, case .str(let s) = v { return .str(joinLines(s)) }
+            if p.i == p.s.count, case .str(let s) = v { return .str(collapseLines ? joinLines(s) : s) }
         }
-        return .str(joinLines(raw))
+        return .str(collapseLines ? joinLines(raw) : raw)
     }
     var p = Parser(raw)
     if let v = try? p.value() {
@@ -2137,7 +2162,19 @@ func validateModified(_ store: Store, kind: String, form: Form) -> [String] {
     guard let t = store.templates[kind] else { return ["unknown kind '\(kind)'"] }
     var c = Checker(templates: store.templates, known: store.known(), mode: .stored)
     c.value(.form(form), .form(t.form), "", 0)
-    return c.errs
+    if !c.errs.isEmpty { return c.errs }
+    if let id = idOf(form), case .list(let l)? = field(form, "depends") {
+        var edges: [String: [String]] = [:]
+        for u in store.files(kind) {
+            guard let f = try? store.load(u), let fid = idOf(f), case .list(let fl)? = field(f, "depends") else {
+                continue
+            }
+            edges[fid] = fl.compactMap(atomOf)
+        }
+        edges[id] = l.compactMap(atomOf)
+        return edgeCycles(edges)
+    }
+    return []
 }
 
 /// Updates a field on the record or nested task with `<id>` (or `plan`) under `.write.lock`.
@@ -2147,7 +2184,7 @@ func runSet(_ store: Store, _ args: [String]) throws -> Int32 {
     let target = args[0]
     let key = args[1]
     let rawVal = args.dropFirst(2).joined(separator: " ")
-    let forbidden: Set<String> = ["id", "n", "criteria", "phases", "tasks"]
+    let forbidden: Set<String> = ["id", "n", "done", "criteria", "phases", "tasks"]
     if forbidden.contains(key) {
         throw Err(msg: "field '\(key)' cannot be modified with write set")
     }
@@ -2161,15 +2198,20 @@ func runSet(_ store: Store, _ args: [String]) throws -> Int32 {
                 if case .form(let pf) = tf.value, pf.head == "derived" || pf.head == "index" {
                     throw Err(msg: "field '\(key)' on \(k) cannot be set directly")
                 }
-                let wantsStr: Bool = {
-                    guard case .form(let pf) = tf.value else { return false }
-                    if pf.head == "grok" || pf.head == "text" { return true }
+                let strMode: (wants: Bool, collapse: Bool) = {
+                    guard case .form(let pf) = tf.value else { return (false, false) }
+                    if pf.head == "grok" { return (true, true) }
+                    if pf.head == "text" { return (true, false) }
                     if pf.head == "opt", case .form(let inner)? = pf.args.first {
-                        return inner.head == "grok" || inner.head == "text"
+                        if inner.head == "grok" { return (true, true) }
+                        if inner.head == "text" { return (true, false) }
                     }
-                    return false
+                    return (false, false)
                 }()
-                let val = try parseCLIValue(rawVal, expectsString: wantsStr)
+                let val = try parseCLIValue(rawVal, expectsString: strMode.wants, collapseLines: strMode.collapse)
+                if k == "finding", key == "status", atomOf(val) == "confirmed" {
+                    throw Err(msg: "a finding is confirmed only by .agents/harness/bin/perf-confirm (rules/PERF.md)")
+                }
                 setOrderedField(&f, tb, key, val)
                 let errs = validateModified(store, kind: k, form: f)
                 if !errs.isEmpty {
@@ -2192,11 +2234,13 @@ func runSet(_ store: Store, _ args: [String]) throws -> Int32 {
                     guard let fieldTmpl = taskTb.first(where: { $0.key == key }) else {
                         throw Err(msg: "nested task has no field '\(key)'")
                     }
-                    let wantsStr: Bool = {
-                        if case .form(let pf) = fieldTmpl.value { return pf.head == "grok" || pf.head == "text" }
-                        return false
+                    let strMode: (wants: Bool, collapse: Bool) = {
+                        guard case .form(let pf) = fieldTmpl.value else { return (false, false) }
+                        if pf.head == "grok" { return (true, true) }
+                        if pf.head == "text" { return (true, false) }
+                        return (false, false)
                     }()
-                    let val = try parseCLIValue(rawVal, expectsString: wantsStr)
+                    let val = try parseCLIValue(rawVal, expectsString: strMode.wants, collapseLines: strMode.collapse)
                     setOrderedField(&tf, taskTb, key, val)
                     tasks[idx] = .form(tf)
                     body[ti].value = .list(tasks)
@@ -2341,6 +2385,19 @@ func runDel(_ store: Store, _ args: [String]) throws -> Int32 {
                 }
             if allDone { throw Err(msg: "phase \(idOf(f) ?? "?") is already done; reopen a task before removing one") }
             tasks.remove(at: idx)
+            if tasks.isEmpty {
+                throw Err(msg: "cannot delete the only remaining task in phase \(idOf(f) ?? "?")")
+            }
+            let remainingAllDone = tasks.allSatisfy { v in
+                if case .form(let tf) = v { return atomOf(field(tf, "done")) == "true" }
+                return false
+            }
+            if remainingAllDone {
+                throw Err(
+                    msg:
+                        "cannot delete the last unfinished task in phase \(idOf(f) ?? "?"); finishing a phase must go through write done"
+                )
+            }
             setField(&f, "tasks", .list(tasks))
             let errs = validateModified(store, kind: "phase", form: f)
             if !errs.isEmpty {

@@ -1,0 +1,14 @@
+// The Swift lint rules `bin/lint` enforces (rules/SWIFT.md). Edited only by the user; a rule left out of this file is off.
+// Every finding fails. To skip one line, write `// lint-ignore: <rule-id>: <why>` on it or on the line above; an ignore with no reason is itself a finding.
+lint() {
+  doc-comment:         rule("every func has a comment above it saying what it does")
+  type-mark:           rule("every struct, enum, class, actor and protocol has a // MARK: - banner above it")
+  type-doc:            rule("every struct, enum, class, actor and protocol has a comment saying what it does")
+  no-mutable-global:   rule("no file scope var; use a let, or keep state inside a type")
+  no-unsafe-sendable:  rule("@unchecked Sendable and nonisolated(unsafe) need a lint-ignore with the reason")
+  mark-sections:       rule("a file over 150 lines needs // MARK: - section banners")
+  no-force:            rule("no try!, as! or fatalError outside tests; handle the failure")
+  no-silent-try:       rule("a try? that drops the error needs a comment saying why")
+  func-length:         rule("a func over 60 lines should be split")
+  ignore-needs-reason: rule("a lint-ignore comment must say why")
+}

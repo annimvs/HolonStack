@@ -1,0 +1,9 @@
+entry(a70da3bf) {
+  name: "Bit set"
+  kind: structure
+  use_when: "A set of small non negative integers, or many boolean flags, stored compactly."
+  smell: "a Set of Int for small ranges, or an array of Bool flags"
+  ships: swift_collections
+  api: "Collections product, BitSet or BitArray"
+  cost: "O(1) test and set, one bit per element"
+}

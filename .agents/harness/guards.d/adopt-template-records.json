@@ -1,0 +1,4 @@
+{
+  "pattern": "(?s)(^|[;&|(`[:space:]])(cp|mv|rm|tee|install|truncate|sed|perl|edit|>>?)[^;&|\\n]*adopt-holon/\\.agents/records/",
+  "message": "adopt-holon/.agents/records/ is the clean template store shipped to adopters; write HolonStack's own records under root .agents/records/ instead."
+}

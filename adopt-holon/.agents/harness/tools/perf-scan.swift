@@ -66,10 +66,21 @@ func loadDetectors(_ proj: String) -> [Detector] {
 func codeOnly(_ line: String) -> String {
     var out = ""
     var inString = false
+    var escaped = false
     var prev: Character = " "
     for c in line {
         if inString {
-            if c == "\"" && prev != "\\" {
+            if escaped {
+                escaped = false
+                prev = " "
+                continue
+            }
+            if c == "\\" {
+                escaped = true
+                prev = c
+                continue
+            }
+            if c == "\"" {
                 inString = false
                 out.append(c)
             }

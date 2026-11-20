@@ -168,8 +168,10 @@ func load(_ path: String) -> Source? {
     var value: UInt64 = 0xcbf2_9ce4_8422_2325
     for byte in data { value = (value ^ UInt64(byte)) &* 0x100_0000_01b3 }
     let digits = String(value, radix: 16)
-    var lines = String(decoding: data, as: UTF8.self).split(separator: "\n", omittingEmptySubsequences: false).map(
-        String.init)
+    var lines = data.split(separator: 0x0A, omittingEmptySubsequences: false).map { slice -> String in
+        let trimmed = slice.last == 0x0D ? slice.dropLast() : slice
+        return String(decoding: trimmed, as: UTF8.self)
+    }
     if lines.last == "" { lines.removeLast() }
     return Source(lines: lines, hash: String(repeating: "0", count: 16 - digits.count) + digits)
 }
@@ -250,7 +252,37 @@ func closes(_ s: [Unicode.Scalar], at start: Int, _ marks: Int, _ hashCount: Int
         && (0..<hashCount).allSatisfy { s[start + marks + $0] == "#" }
 }
 
+/// True when `u` is an ASCII hexadecimal digit (used to spot C++14 digit separators like `1'000`).
+func isAsciiHex(_ u: UnicodeScalar) -> Bool {
+    (u >= "0" && u <= "9") || (u >= "a" && u <= "f") || (u >= "A" && u <= "F")
+}
+
+/// Advances past a closed single-quoted or backtick literal starting at `start`, returning `start + 1` when unclosed
+/// or when `'` is a C++14 digit separator or Rust lifetime so braces on the line are never swallowed.
+func skipDelimited(_ s: [UnicodeScalar], from start: Int, delim: UnicodeScalar) -> Int {
+    if delim == "'" {
+        if start > 0, start + 1 < s.count, isAsciiHex(s[start - 1]), isAsciiHex(s[start + 1]) { return start + 1 }
+        if start > 0, s[start - 1] == "<" || s[start - 1] == "&" {
+            let isCharLit =
+                (start + 2 < s.count && s[start + 2] == "'") || (start + 1 < s.count && s[start + 1] == "\\")
+            if !isCharLit { return start + 1 }
+        }
+    }
+    var i = start + 1
+    while i < s.count {
+        if s[i] == "\\" {
+            i += 2
+        } else if s[i] == delim {
+            return i + 1
+        } else {
+            i += 1
+        }
+    }
+    return start + 1
+}
+
 /// The `{` and `}` on one line that are code, and the state for the next line.
+// lint-ignore: func-length: single-pass brace scanner keeps comment and string states in one loop
 func braces(onLine line: String, _ state: inout LexState) -> [Character] {
     var found: [Character] = []
     let s = Array(line.unicodeScalars)
@@ -306,6 +338,10 @@ func braces(onLine line: String, _ state: inout LexState) -> [Character] {
                 }
                 continue
             }
+        }
+        if c == "'" || c == "`" {
+            i = skipDelimited(s, from: i, delim: c)
+            continue
         }
         if c == "{" { found.append("{") } else if c == "}" { found.append("}") }
         i += 1

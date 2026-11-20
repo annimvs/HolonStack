@@ -337,7 +337,7 @@ func main() -> Int32 {
         }
     }
     let session = (input["session_id"] as? String) ?? (input["conversationId"] as? String) ?? "none"
-    let agent = input["agent_id"] as? String ?? "main"
+    let agent = (input["agent_id"] as? String) ?? (input["agentId"] as? String) ?? "main"
     let url = stateURL(project: project, session: session, agent: agent)
     let held = lock(url)
     defer { if held >= 0 { close(held) } }
@@ -348,17 +348,20 @@ func main() -> Int32 {
     let active = chosen ?? cards.first { $0.name == state.card }
     // a card shown within the last regrowBytes is still near the end of the context, so a switch back to it adds nothing
     let fresh = active.map { stale(shown[$0.name] ?? -1, at: size) } ?? false
+    let canDeliver = !isGemini || event == "PreInvocation"
     var parts: [String] = []
-    if due { parts += cards.filter(\.always).map { render($0, reason: "always present") } }
-    if let active, due || fresh {
-        parts.append(render(active, reason: chosen == nil ? "the active area" : reason))
-        shown[active.name] = size
-        appendEvent(
-            project: project,
-            entry: [
-                "agent": agent, "bytes": size, "card": active.name, "cues": matchedCues,
-                "reason": chosen == nil ? "regrow" : kind, "session": session, "ties": ties,
-            ])
+    if canDeliver {
+        if due { parts += cards.filter(\.always).map { render($0, reason: "always present") } }
+        if let active, due || fresh {
+            parts.append(render(active, reason: chosen == nil ? "the active area" : reason))
+            shown[active.name] = size
+            appendEvent(
+                project: project,
+                entry: [
+                    "agent": agent, "bytes": size, "card": active.name, "cues": matchedCues,
+                    "reason": chosen == nil ? "regrow" : kind, "session": session, "ties": ties,
+                ])
+        }
     }
     if !parts.isEmpty {
         reply(bounded(parts), event: event, isGemini: isGemini)
@@ -366,7 +369,7 @@ func main() -> Int32 {
         print("{}")
     }
     state.card = active?.name ?? state.card
-    state.bytes = due ? size : state.bytes
+    state.bytes = (canDeliver && due) ? size : state.bytes
     state.shown = shown
     writeState(state, to: url)
     return 0

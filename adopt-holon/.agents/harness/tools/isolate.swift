@@ -1,11 +1,10 @@
-// isolate.swift — reads the project's build manifests (SwiftPM Package.swift, Cargo.toml, Node package.json / pnpm-workspace.yaml, Go go.mod, or CMake CMakeLists.txt) under the project root and decides which tasks can run in parallel without touching each other's compile inputs (rules/DELEGATION.md).
-// ADOPTION NOTE (/adopt-holon): SwiftPM, Cargo, Node/pnpm, Go, and CMake work out of the box. For Meson, Ninja, Bazel, Gradle, or Make, add a loader to `loadGraph` while keeping `Graph`, `Claim`, and the CLI unchanged.
+// isolate.swift — reads every package's Package.swift under the project root and decides which tasks can run in parallel without touching each other's compile inputs (rules/DELEGATION.md).
 // A worker's write set is one or more targets. Two workers conflict when either one's write set falls in the other's read closure (itself plus everything it depends on).
 // Usage: isolate graph | plan [--max N] [--choke a,b] [--package file] <task…> | owner <path…> | claim <name> <task…> | release <name…|--all> | claims
 //   task: a target name, several joined by commas (`Syntax,Theme`), or a path under a target's folder.
 //   --max N: the worker cap; the default is $HOLON_WORKERS, else 2. Choke points and external packages always go to the orchestrator.
-// Exit 0 on success, 2 on bad usage or when no manifest is found.
-// The project root is the repository or collection folder that holds the package(s); a path argument is relative to it (`Sources/MyTarget`).
+// Exit 0 on success, 2 on bad usage or when no Package.swift is found.
+// The project root is the collection folder that holds the sibling packages; a path argument is relative to it (`HolonShell/Sources/Syntax`).
 // `--package file` reads one manifest alone, with its paths relative to that file's folder.
 import Foundation
 
@@ -25,12 +24,30 @@ struct Target {
 func matching(_ chars: [Character], from start: Int, open: Character, close: Character) -> Int? {
     var depth = 0
     var inString = false
+    var inLineComment = false
+    var blockComment = 0
     var i = start
     while i < chars.count {
         let c = chars[i]
-        if inString {
+        if inLineComment {
+            if c == "\n" { inLineComment = false }
+        } else if blockComment > 0 {
+            if c == "*", i + 1 < chars.count, chars[i + 1] == "/" {
+                blockComment -= 1
+                i += 1
+            } else if c == "/", i + 1 < chars.count, chars[i + 1] == "*" {
+                blockComment += 1
+                i += 1
+            }
+        } else if inString {
             // a backslash escapes the next character, so a quote after it does not end the string
             if c == "\\" { i += 1 } else if c == "\"" { inString = false }
+        } else if c == "/", i + 1 < chars.count, chars[i + 1] == "/" {
+            inLineComment = true
+            i += 1
+        } else if c == "/", i + 1 < chars.count, chars[i + 1] == "*" {
+            blockComment += 1
+            i += 1
         } else if c == "\"" {
             inString = true
         } else if c == open {
@@ -118,18 +135,65 @@ func parseTarget(_ block: String) -> RawTarget? {
     return RawTarget(name: name, path: path, deps: parsed.deps, products: parsed.products)
 }
 
+/// Finds the `[` and `]` indices of the package-level `targets: [...]` array (skipping product target lists).
+func packageTargetsBounds(_ text: String, _ chars: [Character]) -> (Int, Int)? {
+    guard let re = try? NSRegularExpression(pattern: #"targets:\s*\["#) else { return nil }
+    for m in re.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+        guard let r = Range(m.range, in: text), let openIdx = text[r].lastIndex(of: "[") else { continue }
+        let openPos = text.distance(from: text.startIndex, to: openIdx)
+        guard let closePos = matching(chars, from: openPos, open: "[", close: "]") else { continue }
+        let slice = String(chars[openPos...closePos])
+        if slice.contains(".target(") || slice.contains(".executableTarget(") || slice.contains(".testTarget(") {
+            return (openPos, closePos)
+        }
+    }
+    return nil
+}
+
 /// Takes the Package.swift text; returns its non-test targets in declaration order.
 func parseTargets(_ text: String) -> [RawTarget] {
     let chars = Array(text)
-    guard let marker = text.range(of: "targets:\\s*\\[\\s*\\n", options: .regularExpression),
-        let open = text[marker].lastIndex(of: "["),
-        let close = matching(chars, from: text.distance(from: text.startIndex, to: open), open: "[", close: "]")
-    else { return [] }
-    let start = text.distance(from: text.startIndex, to: open)
+    guard let (start, close) = packageTargetsBounds(text, chars) else { return [] }
     var found: [RawTarget] = []
+    var inLineComment = false
+    var blockComment = 0
     var i = start + 1
     while i < close {
+        let c = chars[i]
+        if inLineComment {
+            if c == "\n" { inLineComment = false }
+            i += 1
+            continue
+        }
+        if blockComment > 0 {
+            if c == "*", i + 1 < close, chars[i + 1] == "/" {
+                blockComment -= 1
+                i += 2
+            } else if c == "/", i + 1 < close, chars[i + 1] == "*" {
+                blockComment += 1
+                i += 2
+            } else {
+                i += 1
+            }
+            continue
+        }
+        if c == "/", i + 1 < close, chars[i + 1] == "/" {
+            inLineComment = true
+            i += 2
+            continue
+        }
+        if c == "/", i + 1 < close, chars[i + 1] == "*" {
+            blockComment += 1
+            i += 2
+            continue
+        }
         let rest = String(chars[i..<min(i + 20, chars.count)])
+        if rest.hasPrefix(".testTarget("), let paren = chars[i...].firstIndex(of: "("),
+            let end = matching(chars, from: paren, open: "(", close: ")")
+        {
+            i = end + 1
+            continue
+        }
         let isTarget = rest.hasPrefix(".target(") || rest.hasPrefix(".executableTarget(")
         guard isTarget, let paren = chars[i...].firstIndex(of: "("),
             let end = matching(chars, from: paren, open: "(", close: ")")

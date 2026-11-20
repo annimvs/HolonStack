@@ -287,10 +287,11 @@ func inspectLine(_ line: Substring) -> (prompt: String?, tools: [(String, String
         }
     }
     walkContent(obj)
-    if raw.contains("BLOCKED by .agents/harness/hooks/guard-bash.swift")
-        || raw.contains("guard-edit:")
-        || raw.contains("check-edit (")
-        || raw.contains("check-drafts:")
+    if errors.isEmpty, tools.isEmpty,
+        raw.contains("BLOCKED by .agents/harness/hooks/guard-bash.swift")
+            || raw.contains("guard-edit:")
+            || raw.contains("check-edit (")
+            || raw.contains("check-drafts:")
     {
         errors.append(raw)
     }
@@ -299,7 +300,9 @@ func inspectLine(_ line: Substring) -> (prompt: String?, tools: [(String, String
 
 /// Scans one `.jsonl` transcript file, replaying `route-semantics` rules and tallying tool calls, `next` hits and hook failures.
 // lint-ignore: func-length: single-pass state machine over transcript lines keeps byte offset and active card in sync
-func scanTranscript(_ path: String, cards: [Card], project: String, into data: inout ReportData) {
+func scanTranscript(
+    _ path: String, cards: [Card], project: String, tallyInjections: Bool, into data: inout ReportData
+) {
     // an unreadable transcript is skipped
     guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return }
     data.transcripts += 1
@@ -313,19 +316,25 @@ func scanTranscript(_ path: String, cards: [Card], project: String, into data: i
         let bytes = line.utf8.count + 1
         offset += bytes
         let (prompt, tools, errors) = inspectLine(line)
-        let due = lastAlways < 0 || offset - lastAlways >= 300_000
+        var due = lastAlways < 0 || offset - lastAlways >= 300_000
         if let p = prompt, !p.isEmpty {
             let m = matchPrompt(p, in: cards)
             if let c = m.card {
                 let fresh = (lastShown[c.name] == nil) || (offset - (lastShown[c.name] ?? 0) >= 300_000)
                 if due || fresh {
-                    var st = data.perCard[c.name, default: CardStats()]
-                    st.byPrompt += 1
-                    for cue in m.cues { st.cueHits[cue, default: 0] += 1 }
-                    for tie in m.ties where !st.ties.contains(tie) { st.ties.append(tie) }
-                    data.perCard[c.name] = st
+                    if tallyInjections {
+                        var st = data.perCard[c.name, default: CardStats()]
+                        st.byPrompt += 1
+                        for cue in m.cues { st.cueHits[cue, default: 0] += 1 }
+                        for tie in m.ties where !st.ties.contains(tie) { st.ties.append(tie) }
+                        data.perCard[c.name] = st
+                    }
                     lastShown[c.name] = offset
                     lastInjectBytes = offset
+                    if due {
+                        lastAlways = offset
+                        due = false
+                    }
                     awaitingFirstNav = true
                 }
                 active = c
@@ -357,11 +366,17 @@ func scanTranscript(_ path: String, cards: [Card], project: String, into data: i
             {
                 let fresh = (lastShown[c.name] == nil) || (offset - (lastShown[c.name] ?? 0) >= 300_000)
                 if due || fresh {
-                    var st = data.perCard[c.name, default: CardStats()]
-                    if due && c.name == active?.name { st.byRegrow += 1 } else { st.byPath += 1 }
-                    data.perCard[c.name] = st
+                    if tallyInjections {
+                        var st = data.perCard[c.name, default: CardStats()]
+                        if due && c.name == active?.name { st.byRegrow += 1 } else { st.byPath += 1 }
+                        data.perCard[c.name] = st
+                    }
                     lastShown[c.name] = offset
                     lastInjectBytes = offset
+                    if due {
+                        lastAlways = offset
+                        due = false
+                    }
                     awaitingFirstNav = true
                 }
                 active = c
@@ -479,6 +494,7 @@ func main() -> Int32 {
     var data = ReportData()
     for c in cards { data.perCard[c.name] = CardStats() }
     loadEvents(project: proj, into: &data)
+    let hasLoggedEvents = data.perCard.values.contains { $0.totalInjections > 0 }
     let compDirs = [
         proj + "/.agents/harness/.cache/compactions",
         proj + "/.agents/harness/.cache/compactions/claude",
@@ -494,7 +510,7 @@ func main() -> Int32 {
     for file in archived + cliFiles {
         let std = URL(fileURLWithPath: file).standardized.path
         guard seen.insert(std).inserted else { continue }
-        scanTranscript(std, cards: cards, project: proj, into: &data)
+        scanTranscript(std, cards: cards, project: proj, tallyInjections: !hasLoggedEvents, into: &data)
     }
     let text = renderReport(cards: cards, data: data)
     let target = proj + "/.agents/records/SEMANTICS.md"

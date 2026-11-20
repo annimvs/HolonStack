@@ -10,7 +10,21 @@ func fieldValue(_ key: String, in text: String) -> String? {
     for line in text.components(separatedBy: "\n") {
         let t = line.trimmingCharacters(in: .whitespaces)
         guard t.hasPrefix(key + ": \""), t.hasSuffix("\""), t.count > key.count + 3 else { continue }
-        return String(t.dropFirst(key.count + 3).dropLast())
+        let raw = String(t.dropFirst(key.count + 3).dropLast())
+        var out = ""
+        var it = raw.makeIterator()
+        while let c = it.next() {
+            if c == "\\", let n = it.next() {
+                switch n {
+                case "n": out.append("\n")
+                case "t": out.append("\t")
+                default: out.append(n)
+                }
+            } else {
+                out.append(c)
+            }
+        }
+        return out
     }
     return nil
 }
@@ -79,7 +93,12 @@ for file in names {
     }
     let run = runShell(check, in: proj)
     if run.status == 0 {
-        print(markConfirmed(path, text, proj: proj) ? "confirmed: \(name)" : "pass but not recorded: \(name)")
+        if markConfirmed(path, text, proj: proj) {
+            print("confirmed: \(name)")
+        } else {
+            print("pass but not recorded: \(name)")
+            failed = true
+        }
     } else {
         print("FAIL: \(name) (check exited \(run.status))\n\(run.tail)")
         failed = true

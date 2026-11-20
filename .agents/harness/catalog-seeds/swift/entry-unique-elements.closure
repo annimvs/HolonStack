@@ -1,0 +1,9 @@
+entry(aa17bb17) {
+  name: "Unique elements"
+  kind: algorithm
+  use_when: "Remove duplicates while keeping first occurrences in order."
+  smell: "a loop that checks a Set and appends to an array"
+  ships: swift_algorithms
+  api: "Algorithms product, uniqued()"
+  cost: "O(n) time and space"
+}

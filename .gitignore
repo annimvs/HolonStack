@@ -2,3 +2,6 @@
 **/.agents/harness/.cache/
 **/.agents/records/.write.lock
 adopt-holon-*.zip
+
+.agents/harness/.cache/
+.agents/records/.write.lock

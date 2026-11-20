@@ -93,7 +93,13 @@ func shellWords(_ s: String) -> [String] {
     }
     while let c = it.next() {
         if let q = quote {
-            if c == q { quote = nil } else { cur.append(c) }
+            if q == "\"", c == "\\" {
+                if let n = it.next() { cur.append(n) }
+            } else if c == q {
+                quote = nil
+            } else {
+                cur.append(c)
+            }
         } else if c == "'" || c == "\"" {
             quote = c
             inWord = true
@@ -114,6 +120,7 @@ func shellWords(_ s: String) -> [String] {
 }
 /// The command's simple commands, each as its words: split at `;`, `&`, `|`, newlines and parentheses outside quotes.
 /// A rule about one command (`sed -i`, `dd`) looks only at that command's words, not at every word on the line.
+// lint-ignore: func-length: single-pass shell tokenizer keeps quote, redirect and separator states together
 func shellSegments(_ s: String) -> [[String]] {
     var segs: [[String]] = []
     var words: [String] = []
@@ -139,7 +146,13 @@ func shellSegments(_ s: String) -> [[String]] {
     }
     while let c = it.next() {
         if let q = quote {
-            if c == q { quote = nil } else { cur.append(c) }
+            if q == "\"", c == "\\" {
+                if let n = it.next() { cur.append(n) }
+            } else if c == q {
+                quote = nil
+            } else {
+                cur.append(c)
+            }
         } else if c == "'" || c == "\"" {
             quote = c
             inWord = true
@@ -148,11 +161,21 @@ func shellSegments(_ s: String) -> [[String]] {
                 cur.append(n)
                 inWord = true
             }
+        } else if c == "&", inWord, cur.hasSuffix(">") || cur.hasSuffix("<") {
+            cur.append(c)
         } else if c == ";" || c == "&" || c == "|" || c == "\n" || c == "(" || c == ")" {
             cut()
         } else if c == " " || c == "\t" {
             flush()
+        } else if c == ">" || c == "<" {
+            let s = String(c)
+            let canJoin = cur.allSatisfy(\.isNumber) || (cur.hasSuffix(s) && !cur.hasSuffix(s + s))
+            if inWord, !canJoin { flush() }
+            cur.append(c)
+            inWord = true
+            if cur.hasSuffix(">>") || cur.hasSuffix("<<") { flush() }
         } else {
+            if inWord, cur.hasSuffix(">") || cur.hasSuffix("<") { flush() }
             cur.append(c)
             inWord = true
         }
@@ -170,39 +193,95 @@ func expand(_ w: String) -> String {
     for v in ["${HOME}", "$HOME"] where w.hasPrefix(v) { return home + w.dropFirst(v.count) }
     return w
 }
+/// Standardizes `..` and `.` segments against the project root so traversal paths cannot match allowed prefixes.
+func normalizedPath(_ w: String) -> String {
+    let expanded = expand(w)
+    let abs = expanded.hasPrefix("/") ? expanded : proj + "/" + expanded
+    return URL(fileURLWithPath: abs).standardized.path
+}
 /// Build output and scratch: the only places a recursive delete may reach.
 func isDisposable(_ w: String) -> Bool {
-    let w = expand(w)
+    let std = normalizedPath(w)
     let buildDirs = [".build", "build", "builddir", "target", "dist", ".next", "__pycache__"]
     for dir in buildDirs {
-        if w == dir || w.hasPrefix(dir + "/") || w == "./" + dir || w.hasPrefix("./" + dir + "/")
-            || w.contains("/" + dir + "/")
-        {
-            return true
-        }
+        if std.hasSuffix("/" + dir) || std.contains("/" + dir + "/") { return true }
     }
-    if w.hasPrefix("/private/tmp/") || w.hasPrefix("/tmp/") { return true }
-    return !tmpTrim.isEmpty && w.hasPrefix("/" + tmpTrim + "/")
+    if std.hasPrefix("/private/tmp/") || std.hasPrefix("/tmp/") { return true }
+    return !tmpTrim.isEmpty && std.hasPrefix("/" + tmpTrim + "/")
 }
 /// Checks whether a path is inside the project, the build output or the scratch folder, so a write there is allowed.
 /// Takes the path as written in the command; returns true when it is inside one of those places.
 func isInsideProject(_ w: String) -> Bool {
-    let w = expand(w)
-    // the project root itself counts, with or without a trailing slash
-    let root = w.hasSuffix("/") && w.count > 1 ? String(w.dropLast()) : w
-    return w.hasPrefix("/dev/") || isDisposable(w) || root == proj || root == realProjPath || w.hasPrefix(proj + "/")
-        || w.hasPrefix(realProjPath + "/")
+    let std = normalizedPath(w)
+    return std.hasPrefix("/dev/") || isDisposable(w) || std == proj || std == realProjPath || std.hasPrefix(proj + "/")
+        || std.hasPrefix(realProjPath + "/")
 }
 let realProjPath = URL(fileURLWithPath: proj).resolvingSymlinksInPath().path
+/// Command prefixes that delegate execution to the following program word.
+let commandWrappers: Set<String> = ["command", "env", "sudo", "nohup", "time", "exec"]
 
-if matches(#"(^|[;&|(`[:space:]])rm[[:space:]]+(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)"#, cmd) {
-    let bad = shellWords(cmd).filter { w in !(w.hasPrefix("-") || w == "rm" || isDisposable(w)) }
-    if !bad.isEmpty { deny("recursive rm outside .build/ and scratch: \(bad.prefix(3).joined(separator: " "))") }
+for seg in shellSegments(cmd) {
+    var operands: [String] = []
+    var flags: [String] = []
+    var cmdWord: String?
+    var skipNext = false
+    for w in seg {
+        if skipNext {
+            skipNext = false
+            continue
+        }
+        if matches(#"^[0-9]*>>?"#, w) || w.hasPrefix("<") {
+            if w == "<" || w == "<<" || w == "<<-" || matches(#"^[0-9]*>>?$"#, w) { skipNext = true }
+            continue
+        }
+        if cmdWord == nil {
+            if w.contains("="), !w.hasPrefix("-"), !w.hasPrefix("/") { continue }
+            if w.hasPrefix("-") || commandWrappers.contains((w as NSString).lastPathComponent) { continue }
+            cmdWord = w
+            continue
+        }
+        if w.hasPrefix("-") { flags.append(w) } else { operands.append(w) }
+    }
+    guard let cmdWord, (cmdWord as NSString).lastPathComponent == "rm" else { continue }
+    let recursive = flags.contains { matches(#"^-[a-zA-Z]*[rR][a-zA-Z]*$|^--recursive$"#, $0) }
+    if recursive {
+        let bad = operands.filter { !isDisposable($0) }
+        if !bad.isEmpty { deny("recursive rm outside .build/ and scratch: \(bad.prefix(3).joined(separator: " "))") }
+    }
 }
 // find -delete / -exec rm and scripting-language recursive deletes are the same thing spelled differently.
-if matches(#"(^|[;&|(`[:space:]])find[[:space:]].*(-delete|-exec(dir)?[[:space:]]+(/bin/)?rm)"#, cmd) {
-    let bad = shellWords(cmd).drop { $0 != "find" }.dropFirst().prefix { !$0.hasPrefix("-") && $0 != "(" && $0 != "!" }
-        .filter { !isDisposable($0) }
+for seg in shellSegments(cmd) {
+    var args: [String] = []
+    var cmdWord: String?
+    var skipNext = false
+    for w in seg {
+        if skipNext {
+            skipNext = false
+            continue
+        }
+        if matches(#"^[0-9]*>>?"#, w) || w.hasPrefix("<") {
+            if w == "<" || w == "<<" || w == "<<-" || matches(#"^[0-9]*>>?$"#, w) { skipNext = true }
+            continue
+        }
+        if cmdWord == nil {
+            if w.contains("="), !w.hasPrefix("-"), !w.hasPrefix("/") { continue }
+            if w.hasPrefix("-") || commandWrappers.contains((w as NSString).lastPathComponent) { continue }
+            cmdWord = w
+            continue
+        }
+        args.append(w)
+    }
+    guard let cmdWord, (cmdWord as NSString).lastPathComponent == "find" else { continue }
+    let hasExecRm = args.indices.contains { i in
+        (args[i] == "-exec" || args[i] == "-execdir") && i + 1 < args.count
+            && (args[i + 1] as NSString).lastPathComponent == "rm"
+    }
+    guard args.contains("-delete") || hasExecRm else { continue }
+    let leadFlags: Set<String> = ["-L", "-H", "-P", "-E", "-X", "-s", "-x", "-d"]
+    let afterFlags = args.drop { leadFlags.contains($0) }
+    let rawPaths = Array(afterFlags.prefix { !$0.hasPrefix("-") && $0 != "(" && $0 != "!" })
+    let paths = rawPaths.isEmpty ? ["."] : rawPaths
+    let bad = paths.filter { !isDisposable($0) }
     if !bad.isEmpty {
         deny("find -delete/-exec rm outside .build/ and scratch: \(bad.prefix(3).joined(separator: " "))")
     }
@@ -259,15 +338,18 @@ func stripHeredocBodies(_ command: String) -> String {
             continue
         }
         kept.append(line)
-        let range = NSRange(line.startIndex..., in: line)
-        if let match = startRe.firstMatch(in: line, range: range), let r = Range(match.range(at: 1), in: line) {
-            delimiter = String(line[r])
+        let unquoted = line.replacingOccurrences(
+            of: #"'[^']*'|"([^"\\]|\\.)*""#, with: " ", options: .regularExpression)
+        let range = NSRange(unquoted.startIndex..., in: unquoted)
+        if let match = startRe.firstMatch(in: unquoted, range: range), let r = Range(match.range(at: 1), in: unquoted) {
+            delimiter = String(unquoted[r])
         }
     }
     return kept.joined(separator: "\n")
 }
 let redirectCmd = stripHeredocBodies(cmd)
-if let re = try? NSRegularExpression(pattern: #"(>>?|tee( -a)?)[[:space:]]*((/|~|\$HOME|\$\{HOME\})[^[:space:];&|)]*)"#)
+if let re = try? NSRegularExpression(
+    pattern: #"(>>?|tee( -a)?)[[:space:]]*['\"]?((/|~|\$HOME|\$\{HOME\})[^[:space:];&|)'\"]*)"#)
 {
     for m in re.matches(in: redirectCmd, range: NSRange(redirectCmd.startIndex..., in: redirectCmd)) {
         guard let r = Range(m.range(at: 3), in: redirectCmd) else { continue }
@@ -308,24 +390,26 @@ let protectedPath =
 let redirect = #"^[0-9]*>>?"#
 /// The flags of `tools/edit.swift` that take a value, so the value is not mistaken for the file operand.
 let editValueFlags: Set<String> = [
-    "--old", "--new", "--old-file", "--new-file", "--at", "--after", "--before",
+    "--old", "--new", "--old-file", "--new-file", "--at", "--after", "--before", "--range",
     "--hash", "--content", "--content-file", "--batch-file",
 ]
 /// Finds the file an `edit` call changes: its first operand that is not a flag or a flag's value.
 /// Takes the command's words after `edit`; returns nil for `--read` (no write) or when no file is named.
 func editFileOperand(_ words: [String]) -> String? {
-    if words.contains("--read") { return nil }
     var skipNext = false
+    var target: String?
     for word in words {
         if skipNext {
             skipNext = false
+        } else if word == "--read" {
+            return nil
         } else if editValueFlags.contains(word) {
             skipNext = true
-        } else if !word.hasPrefix("-") {
-            return word
+        } else if !word.hasPrefix("-"), target == nil {
+            target = word
         }
     }
-    return nil
+    return target
 }
 /// Lists the paths one simple command writes to: redirect targets, `tee`, `rm`, `mv`, `cp` and in-place edit files.
 /// Takes the command's words; returns the target paths, or an empty list when the command writes nothing.
@@ -333,29 +417,34 @@ func editFileOperand(_ words: [String]) -> String? {
 func writeTargets(_ seg: [String]) -> [String] {
     var out: [String] = []
     var plain: [String] = []
-    guard let ci = seg.firstIndex(where: { !$0.contains("=") || $0.hasPrefix("-") || matches(redirect, $0) }) else {
-        return out
-    }
+    var cmdIdx: Int?
     var j = 0
     while j < seg.count {
         let w = seg[j]
         if let r = w.range(of: redirect, options: .regularExpression) {
             let rest = String(w[r.upperBound...])
             if !rest.isEmpty {
-                out.append(rest)
+                if !rest.hasPrefix("&") { out.append(rest) }
             } else if j + 1 < seg.count {
                 out.append(seg[j + 1])
                 j += 1
             }
         } else if w.hasPrefix("<") {
-            if w == "<" { j += 1 }
-        } else if j > ci {
+            if w == "<" || w == "<<" || w == "<<-" { j += 1 }
+        } else if cmdIdx == nil {
+            let base = (w as NSString).lastPathComponent
+            if (!w.contains("=") || w.hasPrefix("/")) && !w.hasPrefix("-") && !commandWrappers.contains(base) {
+                cmdIdx = j
+            }
+        } else {
             plain.append(w)
         }
         j += 1
     }
+    guard let ci = cmdIdx else { return out }
+    let prog = (seg[ci] as NSString).lastPathComponent
     let operands = plain.filter { !$0.hasPrefix("-") }
-    switch seg[ci] {
+    switch prog {
     case "rm", "mv", "truncate", "tee": out += operands
     case "cp", "install", "ln": if let last = operands.last { out.append(last) }
     case "dd": out += plain.filter { $0.hasPrefix("of=") }.map { String($0.dropFirst(3)) }
@@ -376,7 +465,7 @@ func writeTargets(_ seg: [String]) -> [String] {
                 continue
             }  // BSD `sed -i ''`
             if w.hasPrefix("-") {
-                if seg[ci] == "perl", w.contains("e") {
+                if prog == "perl", w.contains("e") {
                     scriptGiven = true
                     k += 2
                     continue
@@ -391,12 +480,12 @@ func writeTargets(_ seg: [String]) -> [String] {
         out += files
     default:
         // `edit FILE …` (the harness tool, by name or by path) writes FILE, so it is held to the same protected paths.
-        if (seg[ci] as NSString).lastPathComponent == "edit", let file = editFileOperand(plain) { out.append(file) }
+        if prog == "edit", let file = editFileOperand(plain) { out.append(file) }
     }
     return out
 }
 for seg in shellSegments(cmd) {
-    if let t = writeTargets(seg).first(where: { matches(protectedPath, expand($0)) }) {
+    if let t = writeTargets(seg).first(where: { matches(protectedPath, normalizedPath($0)) }) {
         deny(
             "\(t): the indexes, generated views and ledger change only through .agents/harness/bin/write, and the templates and reasons only by the user (rules/RECORDS.md)"
         )
@@ -441,13 +530,35 @@ func guardEditReason(for file: String) -> String? {
     guard process.terminationStatus == 2 else { return nil }
     return String(decoding: reason, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }
+/// Extracts the command basename and non-redirect arguments from a segment, skipping leading `VAR=val` and redirects.
+func commandParts(_ seg: [String]) -> (prog: String, args: [String])? {
+    var cmdWord: String?
+    var args: [String] = []
+    var j = 0
+    while j < seg.count {
+        let w = seg[j]
+        if let r = w.range(of: redirect, options: .regularExpression) {
+            if w[r.upperBound...].isEmpty, j + 1 < seg.count { j += 1 }
+        } else if w.hasPrefix("<") {
+            if w == "<" || w == "<<" || w == "<<-" { j += 1 }
+        } else if cmdWord == nil {
+            let base = (w as NSString).lastPathComponent
+            if (!w.contains("=") || w.hasPrefix("/")) && !w.hasPrefix("-") && !commandWrappers.contains(base) {
+                cmdWord = w
+            }
+        } else {
+            args.append(w)
+        }
+        j += 1
+    }
+    guard let cmdWord else { return nil }
+    return ((cmdWord as NSString).lastPathComponent, args)
+}
 for seg in shellSegments(cmd) {
-    guard let start = seg.firstIndex(where: { !$0.contains("=") || $0.hasPrefix("-") }),
-        (seg[start] as NSString).lastPathComponent == "edit",
-        let file = editFileOperand(Array(seg[(start + 1)...]))
-    else { continue }
+    guard let (prog, args) = commandParts(seg), prog == "edit", let file = editFileOperand(args) else { continue }
     let target = expand(file)
-    if matches(recordsPath, target) && !matches(draftsPath, target) {
+    let stdTarget = normalizedPath(file)
+    if matches(recordsPath, stdTarget) && !matches(draftsPath, stdTarget) {
         deny("\(target): records change through `write` or the Edit tool, which checks them; `edit` is for other files")
     }
     if let reason = guardEditReason(for: target) { deny("edit \(target): \(reason)") }
@@ -482,9 +593,8 @@ func redirectTargets(_ seg: [String]) -> [String] {
 /// `awk -i inplace`, `ed` and `ex`, and the targets of redirects, `tee`, `cp` and `install`. Moves, deletes, links,
 /// `truncate`, `dd` and `edit` itself list only their redirects.
 func overwrittenFiles(_ seg: [String]) -> [String] {
-    guard let start = seg.firstIndex(where: { !$0.contains("=") || $0.hasPrefix("-") }) else { return [] }
-    let word = (seg[start] as NSString).lastPathComponent
-    let operands = seg[(start + 1)...].filter { !$0.hasPrefix("-") && !matches(redirect, $0) }
+    guard let (word, args) = commandParts(seg) else { return redirectTargets(seg) }
+    let operands = args.filter { !$0.hasPrefix("-") }
     switch word {
     case "rm", "mv", "ln", "truncate", "dd", "edit": return redirectTargets(seg)
     case "ed", "ex": return redirectTargets(seg) + operands.prefix(1)

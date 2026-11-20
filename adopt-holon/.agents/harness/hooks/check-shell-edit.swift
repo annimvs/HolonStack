@@ -12,7 +12,7 @@ let proj = URL(fileURLWithPath: environment["CLAUDE_PROJECT_DIR"] ?? FileManager
 
 /// The flags of `tools/edit.swift` that take a value, so the value is not mistaken for the file operand.
 let editValueFlags: Set<String> = [
-    "--old", "--new", "--old-file", "--new-file", "--at", "--after", "--before",
+    "--old", "--new", "--old-file", "--new-file", "--at", "--after", "--before", "--range",
     "--hash", "--content", "--content-file", "--batch-file",
 ]
 
@@ -157,6 +157,7 @@ for call in editCalls(in: command) {
     var payload = rawInput
     // read uniform stderr/exit-2 from check-edit and JSON from route-semantics
     payload.removeValue(forKey: "hookEventName")
+    payload["hook_event_name"] = "PostToolUse"
     payload["tool_name"] = call.isRead ? "Read" : "Edit"
     payload["tool_input"] = ["file_path": file]
     // A payload built from parsed JSON always encodes, so a failure here would mean there is nothing to check.
@@ -170,11 +171,19 @@ for call in editCalls(in: command) {
 }
 if !findings.isEmpty {
     let card = additionalContext(of: routed).map { "\n" + $0 + "\n" } ?? ""
-    FileHandle.standardError.write(Data((findings + card).utf8))
+    let message = findings + card
     if isGemini {
-        print("{}")
+        if let data = try? JSONSerialization.data(
+            withJSONObject: ["systemMessage": message], options: [.sortedKeys])
+        {
+            FileHandle.standardOutput.write(data)
+            print()
+        } else {
+            print("{}")
+        }
         exit(0)
     }
+    FileHandle.standardError.write(Data(message.utf8))
     exit(2)
 }
 if isGemini {

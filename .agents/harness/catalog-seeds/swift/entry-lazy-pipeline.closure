@@ -1,0 +1,9 @@
+entry(ff039df9) {
+  name: "Lazy pipeline"
+  kind: pattern
+  use_when: "Chained map and filter steps where only some results are used."
+  smell: "several map and filter calls that each build a full intermediate array"
+  ships: stdlib
+  api: "the lazy property on a sequence"
+  cost: "O(1) extra space until consumed"
+}

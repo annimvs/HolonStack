@@ -1,0 +1,9 @@
+entry(c5252d4d) {
+  name: "Least recently used cache"
+  kind: structure
+  use_when: "A bounded cache that evicts the entry unused for longest."
+  smell: "a dictionary with a timestamp scanned on every eviction"
+  ships: none
+  api: "implement from a dictionary and a linked list or an OrderedDictionary"
+  cost: "O(1) get and put"
+}

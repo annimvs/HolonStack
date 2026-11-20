@@ -1,0 +1,144 @@
+{
+  "hooks" : {
+    "PostCompact" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/post-compact",
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "PostToolUse" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/check-edit",
+            "type" : "command"
+          },
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/route-semantics",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "Edit|Write|MultiEdit"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/route-semantics",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "Read"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/check-shell-edit",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "Bash"
+      }
+    ],
+    "PreCompact" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/pre-compact",
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/guard-agent",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "Agent"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/guard-edit",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "Edit|Write|MultiEdit"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/guard-search",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "Grep"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/guard-bash",
+            "type" : "command"
+          },
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/rewrite-bash",
+            "type" : "command"
+          },
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/guard-search",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "Bash"
+      }
+    ],
+    "SessionStart" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/session-compact",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "compact"
+      }
+    ],
+    "Stop" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/check-drafts",
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStop" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/check-drafts",
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit" : [
+      {
+        "hooks" : [
+          {
+            "command" : "\"$CLAUDE_PROJECT_DIR\"\/.agents\/harness\/bin\/route-semantics",
+            "type" : "command"
+          }
+        ]
+      }
+    ]
+  }
+}

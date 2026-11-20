@@ -101,6 +101,7 @@ struct EditorBuffer {
 
     /// Byte offsets from the start of the first line to the end (after its newline) of the last line in `range`, or nil past the end.
     func byteWindow(lines range: ClosedRange<Int>) -> Range<Int>? {
+        guard !bytes.isEmpty else { return nil }
         var starts = [0]
         for (index, byte) in bytes.enumerated() where byte == 0x0A && index + 1 < bytes.count {
             starts.append(index + 1)
@@ -119,7 +120,9 @@ struct EditorBuffer {
                     "\(path): --range \(range.lowerBound)-\(range.upperBound) is past the last line (\(lines.count))")
         }
         var text = new
-        if !text.isEmpty, text.last != 0x0A, bytes[window.upperBound - 1] == 0x0A { text.append(0x0A) }
+        if !text.isEmpty, text.last != 0x0A, window.upperBound > 0, bytes[window.upperBound - 1] == 0x0A {
+            text.append(0x0A)
+        }
         bytes.replaceSubrange(window, with: text)
     }
 
@@ -685,7 +688,7 @@ enum Commands {
             high = window.upperBound
         }
         if let after = edit.after {
-            guard let position = buffer.matches(of: after).first else {
+            guard let position = buffer.matches(of: after, in: low..<max(low, high)).first else {
                 throw EditFailure(code: ExitCode.noMatch, message: "\(path): no match for --after\(label)")
             }
             low = max(low, position + after.count)

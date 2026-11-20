@@ -1,0 +1,9 @@
+entry(863eb6b4) {
+  name: "Persistent set and dictionary"
+  kind: structure
+  use_when: "Cheap copies that share structure, such as undo history or snapshots of a large value."
+  smell: "copying a whole Set or Dictionary to keep a prior version"
+  ships: swift_collections
+  api: "Collections product, TreeSet or TreeDictionary"
+  cost: "O(log n) updates, copies share storage"
+}

@@ -1,0 +1,10 @@
+entry(b0e289f5) {
+  name: "Hash set"
+  kind: structure
+  use_when: "Membership tests and de duplication when order does not matter."
+  smell: "calling contains on an array inside a loop"
+  detect: "`.contains(`"
+  ships: stdlib
+  api: "Set"
+  cost: "O(1) average lookup, O(n) space"
+}

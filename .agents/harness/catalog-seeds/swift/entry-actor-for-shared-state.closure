@@ -1,0 +1,9 @@
+entry(67d2b2b9) {
+  name: "Actor for shared state"
+  kind: pattern
+  use_when: "State touched from several tasks under Swift concurrency."
+  smell: "a lock held across an await, or unchecked Sendable"
+  ships: stdlib
+  api: "actor"
+  cost: "serialized access, no data races"
+}

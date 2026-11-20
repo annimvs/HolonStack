@@ -1,0 +1,12 @@
+// The reasons an agent may give on a draft's first line, `// cannot fix: <code>: <note>`, when it cannot make the draft pass.
+// Edited only by the user. route: model = hand it to a stronger model; user = it needs your decision; harness = the tool or a template is wrong.
+reasons() {
+  unclear-error:   reason(model, "I don't understand what the checker wants me to change")
+  cannot-fit:      reason(user, "the content can't fit the field's limit without losing meaning")
+  task-unclear:    reason(user, "the task is ambiguous, so any draft would be a guess")
+  rules-conflict:  reason(user, "two rules, or the template and the task, contradict each other")
+  missing-record:  reason(harness, "the draft must name a record that does not exist and cannot be filed first")
+  checker-wrong:   reason(harness, "the draft is correct and the checker rejects it anyway")
+  cost-unknowable: reason(user, "the cost depends on code outside this project, so no command here can settle it")
+  no-check:        reason(user, "the finding looks real but no shell command can measure it")
+}
