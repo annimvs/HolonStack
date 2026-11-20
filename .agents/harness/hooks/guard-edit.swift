@@ -3,7 +3,7 @@
 // `.agents/harness/bin/write`; the templates, `.ids` and `.write.lock` change only when the user edits them (rules/RECORDS.md).
 // Records in PHASES/, TASKS/, MEMORIES/ and QUESTIONS/ may be edited: `check-edit` lints and checks them right after.
 // Exit 2 (reason on stderr) blocks the call. Escape hatch: the user edits the file themselves.
-// Edits to enforcement code (hooks/, guards.d/, hooks.json, tools/) are not blocked: that would stop the harness from being developed.
+// Edits to enforcement code (hooks/, guards.d/, tools/) are not blocked: that would stop the harness from being developed.
 // The same paths are guarded against shell redirects, `sed -i` and the like by guards.d/records-bash.json.
 import Foundation
 
@@ -190,7 +190,10 @@ let writerOwned: Set<String> = [
     "records/PLAN.closure", "records/TODO.closure", "records/MEMORY.md", "records/OPEN.md", "records/PLAN.md",
     "records/TODO.md", "records/BUGS.md", "records/AUDIT.md", "records/PROPOSALS.md", "records/SEMANTICS.md",
 ]
-let userOnly: Set<String> = ["records/.ids", "records/.write.lock", "harness/reasons.closure", "harness/lint.closure"]
+let userOnly: Set<String> = [
+    "records/.ids", "records/.write.lock", "harness/reasons.closure", "harness/lint.closure", "harness/hooks.json",
+    "hooks.json",
+]
 
 if writerOwned.contains(rel) {
     blockEdit("guard-edit: .agents/\(rel) is written only by .agents/harness/bin/write (rules/RECORDS.md)")

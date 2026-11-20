@@ -458,7 +458,7 @@ if matches(#"(^|[;&|[:space:]])security[[:space:]]+[^|;&]*(keychain|-password|fi
 // `cp`/`install`/`ln`, and the file operands of `sed -i`/`perl -i`), not at every word, so a script that only mentions a
 // record path passes. A target built in a variable is not seen.
 let protectedPath =
-    #"(^|/)\.agents/(records/(PLAN\.closure|PLAN\.md|TODO\.closure|TODO\.md|MEMORY\.md|OPEN\.md|BUGS\.md|AUDIT\.md|PROPOSALS\.md|SEMANTICS\.md|\.ids|\.write\.lock)$|harness/reasons\.closure$|harness/lint\.closure$|harness/templates(/|$))"#
+    #"(^|/)\.agents/(records/(PLAN\.closure|PLAN\.md|TODO\.closure|TODO\.md|MEMORY\.md|OPEN\.md|BUGS\.md|AUDIT\.md|PROPOSALS\.md|SEMANTICS\.md|\.ids|\.write\.lock)$|harness/reasons\.closure$|harness/lint\.closure$|harness/hooks\.json$|hooks\.json$|harness/templates(/|$))"#
 let redirect = #"^[0-9]*>>?"#
 /// The flags of `tools/edit.swift` that take a value, so the value is not mistaken for the file operand.
 let editValueFlags: Set<String> = [
