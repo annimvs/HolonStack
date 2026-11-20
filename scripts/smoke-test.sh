@@ -103,8 +103,10 @@ audit(_) {
   area: docs
   unit: ".agents/codebase/CODEBASE.md:10"
   rule: "PRACTICES.md progressive disclosure"
+  severity: high
   impact: high
   effort: low
+  evidence: reproduced
   fix: "Update module diagram to match current source targets."
   status: open
 }
