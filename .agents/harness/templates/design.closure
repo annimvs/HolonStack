@@ -1,0 +1,7 @@
+// store: DESIGN/design-{name}.closure
+design(id()) {
+  name:    grok("what is being built, as a noun phrase")
+  verdict: enum(use_catalog, plain_is_fine, custom)
+  choice:  opt(ref(entry))
+  reason:  text("why this fits the operations and sizes in the brief")
+}

@@ -1,0 +1,9 @@
+entry(74dff899) {
+  name: "Insertion ordered dictionary"
+  kind: structure
+  use_when: "Key lookup where iteration must follow insertion order."
+  smell: "a dictionary plus a separate array of keys"
+  ships: swift_collections
+  api: "Collections product, OrderedDictionary"
+  cost: "O(1) average lookup, O(n) space"
+}

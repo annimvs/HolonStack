@@ -21,7 +21,7 @@ A part is enforcement only if it still holds against an agent that ignores the g
   - `check-edit` checks each save: a draft against its template, a record against its template and canonical form (then it renders the views), Swift under `harness/` against the lint rules, and the hook wiring.
   - `check-drafts` keeps a turn open while a draft fails.
 - **Transport:** the generated `bin/` entry points, and `write`'s file writes under its lock.
-- **Guidance:** `ATLAS.md`, the rules, the README and this file, the skills, and the docs under `codebase/` and `reference/`.
+- **Guidance:** `ATLAS.md`, the rules, the README and this file, the skill, and the docs under `codebase/`, `conformance/` and `reference/`.
 - **Artifacts:** the record stores, their generated views and the `.ids` ledger.
 
 ```mermaid
@@ -66,7 +66,7 @@ flowchart LR
 
     subgraph Guidance["Guidance: markdown agents read"]
         direction TB
-        know["ATLAS.md · harness/README.md · HARNESS.md<br/>codebase/ · reference/"]
+        know["ATLAS.md · harness/README.md · HARNESS.md<br/>codebase/ · conformance/ · reference/"]
         rules["harness/rules/*.md"]
         skill["harness/skills/closure-system"]
     end
@@ -88,7 +88,7 @@ flowchart LR
 
 ## 2. What runs on a hook event
 
-`hooks.json` binds ten events, two hooks on Bash and two after an edit, and `sync-settings` writes them into `.claude/settings.json`. Each hook reads the event's JSON on stdin and exits 2 to refuse, or to show the model what it found. Nothing here commits. The three compaction hooks never refuse: `pre-compact` gives Claude Code instructions for the summary on stdout, and they archive the transcript and the summary and put the record views back into the context after a compaction ([rules/COMPACT.md](rules/COMPACT.md)). `route-semantics` never refuses either: it adds an area's semantics card to the context.
+`hooks.json` binds thirteen events, three hooks on Bash and two after an edit, and `sync-settings` writes them into `.claude/settings.json` and `.agents/hooks.json`. Each hook reads the event's JSON on stdin and exits 2 to refuse, or to show the model what it found. Nothing here commits. The three compaction hooks never refuse: `pre-compact` gives Claude Code instructions for the summary on stdout, and they archive the transcript and the summary and put the record views back into the context after a compaction ([rules/COMPACT.md](rules/COMPACT.md)). `route-semantics` never refuses either: it adds an area's semantics card to the context.
 
 ```mermaid
 %%{init: {
@@ -110,10 +110,24 @@ flowchart LR
     shell(["PreToolUse: Bash"]) --> gb{"guard-bash"}
     gb -- "destructive git · recursive rm outside .build and scratch<br/>writes outside the project · killall/pkill · Keychain<br/>remote-shell tricks · a write onto a protected record path<br/>a guards.d match (inline Python, task criteria)" --> refused["exit 2: refused, reason on stderr"]
     shell --> rb{"rewrite-bash"}
+    shell --> gs{"guard-search"}
     gb -- "no match" --> ok["not refused"]
     rb -- "build.sh · swift build · swift test<br/>not started with RAW=1" --> fr["runs as bin/filter-run<br/>errors and totals shown, full log kept"]
     rb -- "anything else" --> runs["command runs as written"]
     refused -. "a deny outranks the rewrite: the command never runs" .- rb
+
+    presearch(["PreToolUse: Grep"]) --> gs
+    gs -- "grep/rg on project files<br/>HOLON_GREP_GUARD: advise or deny" --> seeknote["advise: steer to bin/seek<br/>deny: exit 2"]
+    gs -- "pipe · outside project · conformance/reference" --> searchok["not refused"]
+
+    preagent(["PreToolUse: Agent"]) --> ga{"guard-agent"}
+    ga -- "code worker without an unbound claim<br/>named in its prompt" --> refusedagent["exit 2: refused"]
+    ga -- "read-only type · [unrestricted] · claim named" --> agentok["spawn proceeds"]
+
+    postbash(["PostToolUse: Bash"]) --> cse{"check-shell-edit"}
+    cse -- "ran bin/edit FILE" --> ce
+    cse -- "ran bin/edit FILE --read" --> rs
+    cse -- "anything else" --> bashquiet["nothing"]
 
     preedit(["PreToolUse: Edit · Write · MultiEdit"]) --> ge{"guard-edit"}
     ge -- "records/ index or view · .ids · .write.lock<br/>harness/templates/ · reasons.closure · lint.closure<br/>a drafts/*.escalate · changed task criteria" --> refusededit["exit 2: refused"]
@@ -192,7 +206,7 @@ flowchart TB
 **`done <task>`** runs each criterion's `check:` from the project folder and prints `pass`, `confirmed` or `FAIL` for each.
 - **If any fails,** the task stays open.
 - **If all pass,** it takes the lock, sets `done: true`, checks the record, writes it, renders the views, and prints the evidence.
-- **It commits nothing,** and there is no lint gate on the project's `Sources/`.
+- **It commits nothing,** and there is no lint gate on `HolonShell/Sources/`.
 
 `reopen` sets `done: false` without running anything.
 

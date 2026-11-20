@@ -1,0 +1,15 @@
+// store: FINDINGS/finding-{name}.closure
+// One cost finding about one unit of code. `check` is a shell command that exits 0 when the gap is measured; only `perf-confirm` moves status to confirmed.
+finding(id()) {
+  name:      grok("noun phrase, >= 2 words, <= 8 words, no dashes")
+  unit:      grok("path and line of the code, <= 6 words")
+  worth:     enum(meaningful, redundant, waste, vestigial)
+  stage:     enum(runtime, compile, startup)
+  declared:  grok("the cost the code has now, one line")
+  necessary: grok("the cost the job needs, one line")
+  verdict:   enum(efficient, inefficient, unverified)
+  priority:  enum(none, low, medium, high)
+  fix:       opt(ref(entry))
+  check:     grok("a shell command that exits 0 when the gap is measured, or the word manual")
+  status:    enum(open, confirmed, fixed, wontfix)
+}

@@ -1,0 +1,23 @@
+semantics(25c4ef80) {
+  name: "clients"
+  scope: routed
+  paths: ["adopt-holon/", ".agents/reference/", "scripts/smoke-test.sh"]
+  cues: ["adopt-holon", "claude", "antigravity", "gemini", "openai", "codex", "reference", "tool_use", "hooks.json", "skills"]
+  holds: """
+    adopt-holon/ is the clean template bundle copied into adopting repositories; root .agents/ is HolonStack's dogfooded workspace.
+    Upstream specifications for Claude Code, Antigravity, Gemini CLI, OpenAI Codex, Agent Skills, and AGENTS.md live verbatim under .agents/reference/.
+    Upstream reference files are never edited in place; fetch a newer edition and update .agents/reference/README.md.
+    Shared harness fixes are ported to both root .agents/harness/ and adopt-holon/.agents/harness/, while root-only guards stay out of adopt-holon/.
+    scripts/smoke-test.sh stages adopt-holon/ in an isolated temp workspace and verifies bootstrap, lint, check-docs, write, edit, seek, isolate, and guards.
+    """
+  terms: """
+    template bundle: adopt-holon/.agents/ and adopt-holon/AGENTS.md shipped to adopting repos
+    dogfood root: root .agents/ holding HolonStack's own maps, references, and active records
+    upstream reference: verbatim published doc under .agents/reference/
+    """
+  next: """
+    .agents/reference/README.md: finding the exact upstream hook, skill, or tool-use spec
+    .agents/codebase/maps/adopt-holon.md: files inside the distributable /adopt-holon bundle
+    .agents/codebase/maps/scripts-and-ci.md: end-to-end smoke test and CI matrix
+    """
+}

@@ -3,7 +3,7 @@
 // `.agents/harness/bin/write`; the templates, `.ids` and `.write.lock` change only when the user edits them (rules/RECORDS.md).
 // Records in PHASES/, TASKS/, MEMORIES/ and QUESTIONS/ may be edited: `check-edit` lints and checks them right after.
 // Exit 2 (reason on stderr) blocks the call. Escape hatch: the user edits the file themselves.
-// Edits to enforcement code (hooks/, guards.d/, hooks.json, tools/) are not blocked: that would stop the harness from being developed.
+// Edits to enforcement code (hooks/, guards.d/, tools/) are not blocked: that would stop the harness from being developed.
 // The same paths are guarded against shell redirects, `sed -i` and the like by guards.d/records-bash.json.
 import Foundation
 
@@ -83,12 +83,12 @@ func bindClaim(agent: String, name: String, claims: [String: [String: Any]]) -> 
     guard var claim = claims[name] else {
         return "guard-edit: no claim named \(name); the orchestrator files it with `isolate claim`"
     }
-    if let bound = claim["agent"] as? String, bound != agent {
+    if let bound = claim["agent"] as? String, !bound.isEmpty, bound != agent {
         return "guard-edit: claim \(name) already belongs to another agent"
     }
     claim["agent"] = agent
     guard let data = try? JSONSerialization.data(withJSONObject: claim, options: [.sortedKeys]),
-        (try? data.write(to: URL(fileURLWithPath: claimsDir + "/" + name + ".json"))) != nil
+        (try? data.write(to: URL(fileURLWithPath: claimsDir + "/" + name + ".json"), options: .atomic)) != nil
     else { return "guard-edit: could not bind claim \(name)" }
     return nil
 }
@@ -103,7 +103,8 @@ func enforceClaim(agent: String) {
     if path.hasPrefix(claimsDir + "/"), path.hasSuffix(".bind") {
         let name = String(path.dropFirst(claimsDir.count + 1).dropLast(5))
         if let problem = bindClaim(agent: agent, name: name, claims: claims) { blockEdit(problem) }
-        return
+        if isGemini { print("{\"decision\":\"allow\"}") }
+        exit(0)
     }
     guard path.hasPrefix(proj + "/"), !path.hasPrefix(proj + "/.agents/") else { return }
     let rel = String(path.dropFirst(proj.count + 1))
@@ -145,6 +146,7 @@ func steerToEditTool() {
     guard editGuardMode != "off", environment["HOLON_ALLOW_BUILTIN_EDIT"] != "1",
         rawInput["via_edit_tool"] as? Bool != true, path.hasPrefix(proj + "/"),
         !path.hasPrefix(proj + "/.agents/records/"),
+        !(path.hasPrefix(claimsDir + "/") && path.hasSuffix(".bind")),
         !steeringSkipped.contains(URL(fileURLWithPath: path).pathExtension),
         FileManager.default.isExecutableFile(atPath: tool)
     else { return }
@@ -173,7 +175,9 @@ func steerToEditTool() {
     }
 }
 
-if let agent = rawInput["agent_id"] as? String, !agent.isEmpty { enforceClaim(agent: agent) }
+if let agent = (rawInput["agent_id"] as? String) ?? (rawInput["agentId"] as? String), !agent.isEmpty {
+    enforceClaim(agent: agent)
+}
 guard path.hasPrefix(proj + "/.agents/") else {
     steerToEditTool()
     if isGemini { print("{\"decision\":\"allow\"}") }
@@ -186,7 +190,10 @@ let writerOwned: Set<String> = [
     "records/PLAN.closure", "records/TODO.closure", "records/MEMORY.md", "records/OPEN.md", "records/PLAN.md",
     "records/TODO.md", "records/BUGS.md", "records/AUDIT.md", "records/PROPOSALS.md", "records/SEMANTICS.md",
 ]
-let userOnly: Set<String> = ["records/.ids", "records/.write.lock", "harness/reasons.closure", "harness/lint.closure"]
+let userOnly: Set<String> = [
+    "records/.ids", "records/.write.lock", "harness/reasons.closure", "harness/lint.closure", "harness/hooks.json",
+    "hooks.json",
+]
 
 if writerOwned.contains(rel) {
     blockEdit("guard-edit: .agents/\(rel) is written only by .agents/harness/bin/write (rules/RECORDS.md)")
@@ -205,7 +212,7 @@ if userOnly.contains(rel) || rel.hasPrefix("harness/templates/") {
 /// Takes the text of a record; returns the trimmed lines that hold its criteria, in order.
 func criteriaLines(_ text: String) -> [String] {
     text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { line in
-        ["criteria:", "criterion(", "check:", "text:"].contains { line.hasPrefix($0) }
+        ["criteria:", "criterion(", "check:", "text:", "done:"].contains { line.hasPrefix($0) }
     }
 }
 
@@ -214,19 +221,28 @@ func criteriaLines(_ text: String) -> [String] {
 if rel.hasPrefix("records/PHASES/") || rel.hasPrefix("records/TASKS/") {
     let before = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
     var after = before
-    if let content = toolInput["content"] as? String {
+    if let content = (toolInput["content"] as? String) ?? (toolInput["Content"] as? String)
+        ?? (toolInput["CodeContent"] as? String)
+    {
         after = content
-    } else if let old = toolInput["old_string"] as? String, let new = toolInput["new_string"] as? String {
+    } else if let old = (toolInput["old_string"] as? String) ?? (toolInput["Target"] as? String)
+        ?? (toolInput["TargetContent"] as? String),
+        let new = (toolInput["new_string"] as? String) ?? (toolInput["Replacement"] as? String)
+            ?? (toolInput["ReplacementContent"] as? String)
+    {
         after = before.replacingOccurrences(of: old, with: new)
-    } else if let edits = toolInput["edits"] as? [[String: Any]] {
+    } else if let edits = (toolInput["edits"] as? [[String: Any]])
+        ?? (toolInput["ReplacementChunks"] as? [[String: Any]])
+    {
         for edit in edits {
-            after = after.replacingOccurrences(
-                of: edit["old_string"] as? String ?? "", with: edit["new_string"] as? String ?? "")
+            let old = (edit["old_string"] as? String) ?? (edit["TargetContent"] as? String) ?? ""
+            let new = (edit["new_string"] as? String) ?? (edit["ReplacementContent"] as? String) ?? ""
+            after = after.replacingOccurrences(of: old, with: new)
         }
     }
     if criteriaLines(after) != criteriaLines(before) {
         blockEdit(
-            "guard-edit: the criteria in .agents/\(rel) are fixed once filed; the user changes them (rules/RECORDS.md)"
+            "guard-edit: criteria and done status in .agents/\(rel) cannot be edited directly; use `write done` or ask the user (rules/RECORDS.md)"
         )
     }
 }

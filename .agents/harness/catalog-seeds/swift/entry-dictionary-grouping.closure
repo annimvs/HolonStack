@@ -1,0 +1,9 @@
+entry(2a699c78) {
+  name: "Dictionary grouping"
+  kind: algorithm
+  use_when: "Bucket items by a computed key in one pass."
+  smell: "a loop that appends into a dictionary of arrays by hand"
+  ships: stdlib
+  api: "Dictionary(grouping:by:)"
+  cost: "O(n) time and space"
+}

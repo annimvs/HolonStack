@@ -1,0 +1,9 @@
+entry(231e19d2) {
+  name: "Combinations and permutations"
+  kind: algorithm
+  use_when: "Enumerate subsets or orderings of a collection."
+  smell: "recursive helper functions written by hand"
+  ships: swift_algorithms
+  api: "Algorithms product, combinations(ofCount:) and permutations(ofCount:)"
+  cost: "combinatorial in the size of the input"
+}

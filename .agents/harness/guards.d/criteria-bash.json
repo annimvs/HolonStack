@@ -1,0 +1,6 @@
+[
+  {
+    "pattern": "(?s)^(?=.*(criteri|check:)).*(>>?|\\btee\\b|\\bsed[[:space:]]+-i|\\bperl[[:space:]]+-[^[:space:]]*i)[^\\n;&|]*\\.agents/records/(PHASES|TASKS)/",
+    "message": "task criteria are fixed once filed and the user changes them; do not rewrite a phase or task record from the shell when the command touches criteria or checks (see .agents/harness/rules/RECORDS.md). To change a check, ask the user, or file a new task with the criteria you need."
+  }
+]

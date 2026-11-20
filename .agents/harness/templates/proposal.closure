@@ -1,0 +1,16 @@
+// store: PROPOSALS/proposal-{name}.closure
+// Prose limits count each `code span` as one word, so technical detail is kept verbatim.
+proposal(id()) {
+  name:    grok("noun phrase, >= 2 words, <= 8 words, no dashes")
+  summary: grok("one sentence, <= 30 words")
+  status:  enum(open, accepted, rejected, done)
+  steps:   many [
+    step(id()) {
+      title:  grok("noun phrase, >= 2 words, <= 6 words, no dashes")
+      detail: opt(grok("one sentence, <= 40 words"))
+      points: many [ grok("one line, <= 30 words") ]
+    }
+  ]
+  yours:   many [ grok("one line: what the user must do or decide, <= 40 words") ]
+  ask:     opt(grok("one question, <= 25 words"))
+}

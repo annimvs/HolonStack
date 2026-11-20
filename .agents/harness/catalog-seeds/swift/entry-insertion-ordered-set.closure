@@ -1,0 +1,9 @@
+entry(2dc98d8c) {
+  name: "Insertion ordered set"
+  kind: structure
+  use_when: "Unique elements that must keep the order they were added in, with fast membership tests."
+  smell: "an array plus a Set kept in step, or contains checks on an array"
+  ships: swift_collections
+  api: "Collections product, OrderedSet"
+  cost: "O(1) average lookup and append, O(n) space"
+}

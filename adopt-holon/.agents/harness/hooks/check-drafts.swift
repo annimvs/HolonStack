@@ -28,17 +28,36 @@ guard !transcript.isEmpty, let text = try? String(contentsOfFile: transcript, en
     exit(0)
 }
 
-// drafts this agent saved itself (the file_path of its own Write or Edit calls), not ones it only mentions, which may be
-// another agent's; those that still exist
+// drafts this agent saved itself (the file_path of its own Write or Edit calls), not ones it only read or mentioned
+let writeTools: Set<String> = [
+    "Write", "Edit", "MultiEdit", "write_file", "edit_file", "write_to_file", "replace_file_content",
+    "multi_replace_file_content",
+]
+let shellTools: Set<String> = ["Bash", "run_command"]
 var drafts: [String] = []
-if let re = try? NSRegularExpression(
+let fileRe = try? NSRegularExpression(
     pattern:
         #""(?:file_path|TargetFile|AbsolutePath|Path)"\s*:\s*"[^"]*?(\.agents/records/drafts/[A-Za-z0-9._-]+\.closure)""#
-) {
-    for m in re.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
-        guard let r = Range(m.range(at: 1), in: text) else { continue }
-        let p = proj + "/" + text[r]
-        if !drafts.contains(p), FileManager.default.fileExists(atPath: p) { drafts.append(p) }
+)
+let shellRe = try? NSRegularExpression(
+    pattern:
+        #"(?:>>?\s*|tee\s+(?:-a\s+)?|bin/edit\s+(?:--[a-z-]+\s+\S+\s+)*|(?:cp|mv|install)\s+(?:-[a-zA-Z]+\s+)*[^\s"';&|]+\s+)[^\s"';&|]*?(\.agents/records/drafts/[A-Za-z0-9._-]+\.closure)"#
+)
+for line in text.split(separator: "\n") {
+    let s = String(line)
+    if let re = fileRe, writeTools.contains(where: { s.contains("\"\($0)\"") }) {
+        for m in re.matches(in: s, range: NSRange(s.startIndex..., in: s)) {
+            guard let r = Range(m.range(at: 1), in: s) else { continue }
+            let p = proj + "/" + s[r]
+            if !drafts.contains(p), FileManager.default.fileExists(atPath: p) { drafts.append(p) }
+        }
+    }
+    if let re = shellRe, shellTools.contains(where: { s.contains("\"\($0)\"") }), !s.contains("--read") {
+        for m in re.matches(in: s, range: NSRange(s.startIndex..., in: s)) {
+            guard let r = Range(m.range(at: 1), in: s) else { continue }
+            let p = proj + "/" + s[r]
+            if !drafts.contains(p), FileManager.default.fileExists(atPath: p) { drafts.append(p) }
+        }
     }
 }
 guard !drafts.isEmpty else {
@@ -94,8 +113,12 @@ func quote(_ s: String) -> String {
 /// Writes a `<draft>.escalate` closure record that hands a failing draft to its route.
 /// Takes the draft path, the reason code, the route, a note and the checker output; does nothing if an escalation already exists.
 func escalate(_ draft: String, code: String, route: String, note: String, checker: String) {
-    // an open escalation keeps its history (tiers tried, question filed); the orchestrator owns it from here
-    if FileManager.default.fileExists(atPath: draft + ".escalate") { return }
+    // keep an open escalation with history or a real reason, but let an explicit reason replace a placeholder `none`
+    let escPath = draft + ".escalate"
+    if let existing = try? String(contentsOfFile: escPath, encoding: .utf8) {
+        let isPlaceholder = existing.contains("  reason: none\n") && !existing.contains("  tried:")
+        if !(isPlaceholder && code != "none") { return }
+    }
     let name = URL(fileURLWithPath: draft).deletingPathExtension().lastPathComponent
     let stem = String(name.map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" ? $0 : "-" })
     let rel = draft.hasPrefix(proj + "/") ? String(draft.dropFirst(proj.count + 1)) : draft
@@ -115,7 +138,9 @@ for d in drafts {
         try? FileManager.default.removeItem(atPath: d + ".escalate")
         continue
     }
-    let first = ((try? String(contentsOfFile: d, encoding: .utf8)) ?? "").components(separatedBy: "\n").first ?? ""
+    let rawDraft = ((try? String(contentsOfFile: d, encoding: .utf8)) ?? "")
+        .replacingOccurrences(of: "\r\n", with: "\n")
+    let first = rawDraft.components(separatedBy: "\n").first ?? ""
     if first.hasPrefix("// cannot fix:") {
         let rest = first.dropFirst("// cannot fix:".count)
         let parts = rest.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }

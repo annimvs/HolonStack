@@ -1,0 +1,8 @@
+// store: QUESTIONS/question-{name}.closure
+question(id()) {
+  name:    grok("noun phrase, <= 8 words, no dashes")
+  ask:     grok("one question, <= 40 words")
+  context: text("what is blocked on it, and what you will do by default")
+  status:  enum(open, answered, dropped)
+  answer:  opt(grok("the user's answer, <= 200 chars"))
+}

@@ -31,11 +31,24 @@ func codeOnly(_ line: String) -> String {
     var out = ""
     var inString = false
     var raw = false
+    var escaped = false
     var prev: Character = " "
     var chars = line.makeIterator()
     while let c = chars.next() {
         if inString {
-            let closes = raw ? (c == "#" && prev == "\"") : (c == "\"" && prev != "\\")
+            if !raw {
+                if escaped {
+                    escaped = false
+                    prev = " "
+                    continue
+                }
+                if c == "\\" {
+                    escaped = true
+                    prev = c
+                    continue
+                }
+            }
+            let closes = raw ? (c == "#" && prev == "\"") : (c == "\"")
             if closes {
                 inString = false
                 out.append(c)
@@ -259,6 +272,11 @@ var failed = false
 var styleSkipped = false
 var compilerSkipped = false
 for f in files {
+    guard FileManager.default.isReadableFile(atPath: f) else {
+        print("lint: cannot read \(f)")
+        failed = true
+        continue
+    }
     // style is checked only where the project has chosen one, with a `.swift-format` file
     if hasStyleConfig(f) {
         if let found = styleFindings(f) {

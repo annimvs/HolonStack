@@ -1,0 +1,9 @@
+entry(5c406c13) {
+  name: "Trie"
+  kind: structure
+  use_when: "Prefix lookup and autocomplete over many strings."
+  smell: "filtering an array of strings with hasPrefix on every query"
+  ships: none
+  api: "implement as a node type with a dictionary of children"
+  cost: "O(k) lookup for key length k"
+}

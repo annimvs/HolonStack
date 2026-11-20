@@ -1,0 +1,9 @@
+entry(01902b76) {
+  name: "Sliding window"
+  kind: algorithm
+  use_when: "Look at every run of N adjacent elements."
+  smell: "nested index loops over neighbouring elements"
+  ships: swift_algorithms
+  api: "Algorithms product, windows(ofCount:)"
+  cost: "O(n) time"
+}

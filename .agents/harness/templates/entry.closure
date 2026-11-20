@@ -1,0 +1,11 @@
+// store: CATALOG/entry-{name}.closure
+entry(id()) {
+  name:     grok("the structure, algorithm or pattern, as a noun phrase")
+  kind:     enum(structure, algorithm, pattern)
+  use_when: text("the operations and sizes where it wins over a plain array")
+  smell:    grok("the hand-rolled code it replaces")
+  detect:   opt(grok("code spans the scanner looks for inside a loop, such as `firstIndex(of:`"))
+  ships:    enum(stdlib, package, swift_collections, swift_algorithms, swift_async_algorithms, none)
+  api:      grok("the type or function to use; for a package, the product and type")
+  cost:     grok("time and space in one line")
+}

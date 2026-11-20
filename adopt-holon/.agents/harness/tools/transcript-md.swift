@@ -313,6 +313,11 @@ func renderMarkdown(_ t: ParsedTranscript, lastTurns: Int? = nil) -> String {
 
 /// Converts a single `.jsonl` file to its sibling `.md` file and returns the `.md` path and parsed transcript.
 func convertFile(_ jsonlPath: String, project: String) throws -> (mdPath: String, parsed: ParsedTranscript) {
+    guard FileManager.default.isReadableFile(atPath: jsonlPath) else {
+        throw NSError(
+            domain: "transcript-md", code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "cannot read \(jsonlPath)"])
+    }
     let parsed = parseTranscript(at: jsonlPath, project: project)
     let mdPath =
         jsonlPath.hasSuffix(".jsonl")

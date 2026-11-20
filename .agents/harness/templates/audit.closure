@@ -1,0 +1,15 @@
+// store: AUDITS/audit-{name}.closure
+// One architectural, doc, modularity, logic, enforcement, or language-rule finding from /holon-audit.
+audit(id()) {
+  name:     grok("noun phrase, >= 2 words, <= 8 words, no dashes")
+  area:     enum(docs, modularity, patterns, language, lint, logic, enforcement)
+  unit:     grok("path and line of the code or doc, <= 6 words")
+  rule:     grok("rule or doc violated, <= 6 words")
+  severity: enum(low, medium, high)
+  impact:   enum(low, medium, high)
+  effort:   enum(low, medium, high)
+  evidence: enum(reproduced, inferred)
+  repro:    opt(grok("command or payload that reproduces the finding"))
+  fix:      grok("concrete change in one line, <= 30 words")
+  status:   enum(open, proposed, fixed, wontfix)
+}

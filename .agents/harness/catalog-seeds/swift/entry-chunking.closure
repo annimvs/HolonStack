@@ -1,0 +1,9 @@
+entry(5c7f03a1) {
+  name: "Chunking"
+  kind: algorithm
+  use_when: "Split a collection into consecutive groups of a size or by a rule."
+  smell: "a stride loop that slices by hand"
+  ships: swift_algorithms
+  api: "Algorithms product, chunked(by:) and chunks(ofCount:)"
+  cost: "O(n) time"
+}

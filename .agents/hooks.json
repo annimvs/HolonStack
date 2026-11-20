@@ -1,0 +1,99 @@
+{
+  "harness" : {
+    "PostToolUse" : [
+      {
+        "hooks" : [
+          {
+            "command" : ".\/harness\/bin\/check-shell-edit",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "run_command"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : ".\/harness\/bin\/check-edit",
+            "type" : "command"
+          },
+          {
+            "command" : ".\/harness\/bin\/route-semantics",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "write_to_file|replace_file_content|multi_replace_file_content|write_file|edit_file"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : ".\/harness\/bin\/route-semantics",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "view_file|read_file"
+      }
+    ],
+    "PreInvocation" : [
+      {
+        "command" : ".\/harness\/bin\/route-semantics",
+        "type" : "command"
+      }
+    ],
+    "PreToolUse" : [
+      {
+        "hooks" : [
+          {
+            "command" : ".\/harness\/bin\/guard-bash",
+            "type" : "command"
+          },
+          {
+            "command" : ".\/harness\/bin\/rewrite-bash",
+            "type" : "command"
+          },
+          {
+            "command" : ".\/harness\/bin\/guard-search",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "run_command"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : ".\/harness\/bin\/guard-edit",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "write_to_file|replace_file_content|multi_replace_file_content|write_file|edit_file"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : ".\/harness\/bin\/guard-search",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "grep_search"
+      },
+      {
+        "hooks" : [
+          {
+            "command" : ".\/harness\/bin\/guard-agent",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "invoke_subagent"
+      }
+    ],
+    "Stop" : [
+      {
+        "command" : ".\/harness\/bin\/check-drafts",
+        "type" : "command"
+      },
+      {
+        "command" : ".\/harness\/bin\/pre-compact",
+        "type" : "command"
+      }
+    ]
+  }
+}

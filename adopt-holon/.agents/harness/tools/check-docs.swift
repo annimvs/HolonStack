@@ -22,11 +22,11 @@ func docs(in dir: String) -> [String] {
 /// Lists `SKILL.md` files under `.agents/harness/skills/<name>`, sorted, relative to the project root.
 func skillDocs() -> [String] {
     let base = ".agents/harness/skills"
-    let names = ((try? fm.contentsOfDirectory(atPath: proj.appendingPathComponent(base).path)) ?? [])
+    let names = ((try? FileManager.default.contentsOfDirectory(atPath: proj.appendingPathComponent(base).path)) ?? [])
         .filter { !$0.hasPrefix(".") }.sorted()
     return names.compactMap { name in
         let rel = "\(base)/\(name)/SKILL.md"
-        return fm.fileExists(atPath: proj.appendingPathComponent(rel).path) ? rel : nil
+        return FileManager.default.fileExists(atPath: proj.appendingPathComponent(rel).path) ? rel : nil
     }
 }
 let scanned = [

@@ -1,0 +1,8 @@
+// store: INTERFACES/interface-{name}.closure
+interface(id()) {
+  name:        grok("noun phrase, >= 2 words, <= 8 words, no dashes")
+  command_api: grok("one line, <= 30 chars")
+  inputs:      many [ grok("name and type, <= 20 words") ]
+  output:      grok("one sentence: return type or shape, <= 25 words")
+  error_exit:  enum(code_1, code_2, custom)
+}

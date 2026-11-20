@@ -1,0 +1,7 @@
+// store: RESULTS/result-{name}.closure
+result(id()) {
+  name:    grok("what the task was, in a noun phrase")
+  status:  enum(done, failed, blocked)
+  report:  text("what finished, where it stopped, and what you would do next")
+  touched: many [ grok("a file path") ]
+}
