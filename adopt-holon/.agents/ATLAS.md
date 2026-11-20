@@ -70,7 +70,7 @@ Add, remove or rename a file under `.agents/` → update its row here in the sam
 | `harness/bin/bootstrap.sh`, `harness/bin/` | Bootstrapping and calling a tool or hook by name: `bootstrap.sh` runs `sync-settings` to generate the `bin/` entry points and compiles `hooks/*.swift` and `tools/*.swift` with `swiftc` into `.cache/bin/` | [SCRIPTS](harness/rules/SCRIPTS.md) |
 | `harness/skills/closure-system/` | A walkthrough of drafting, checking and filing a record | [SKILL.md](harness/skills/closure-system/SKILL.md) |
 | `harness/skills/seek/`, `edit/` | Searching the project and changing a file: the commands, the seek-then-edit loop, exit codes | [seek](harness/skills/seek/SKILL.md), [edit](harness/skills/edit/SKILL.md) |
-| `harness/skills/log-bug/`, `remember/`, `plan-and-enact/`, `inject-context/`, `holon-audit/` | Filing a confirmed bug, saving a memory, planning and carrying out multi-step work, loading the latest Claude/Gemini Markdown transcript, or running a structured codebase audit | [log-bug](harness/skills/log-bug/SKILL.md), [remember](harness/skills/remember/SKILL.md), [plan-and-enact](harness/skills/plan-and-enact/SKILL.md), [inject-context](harness/skills/inject-context/SKILL.md), [holon-audit](harness/skills/holon-audit/SKILL.md) |
+| `harness/skills/log-bug/`, `remember/`, `plan-and-enact/`, `work-queue/`, `inject-context/`, `holon-audit/` | Filing a confirmed bug, saving a memory, planning and carrying out multi-step work, draining queued tasks via `isolate` claims, loading the latest Claude/Gemini Markdown transcript, or running a structured codebase audit | [log-bug](harness/skills/log-bug/SKILL.md), [remember](harness/skills/remember/SKILL.md), [plan-and-enact](harness/skills/plan-and-enact/SKILL.md), [work-queue](harness/skills/work-queue/SKILL.md), [inject-context](harness/skills/inject-context/SKILL.md), [holon-audit](harness/skills/holon-audit/SKILL.md) |
 | `harness/guards.d/records-delete.json` | A command was refused for deleting or moving a stored record from the shell | [RECORDS](harness/rules/RECORDS.md) |
 
 ## Rules
@@ -79,6 +79,7 @@ Add, remove or rename a file under `.agents/` → update its row here in the sam
 |---|---|
 | [ACCESS](harness/rules/ACCESS.md) | Before anything else: what an agent may do here |
 | [QUIET](harness/rules/QUIET.md) | Every reply: how much to say, asking the user to choose, saying nothing while you wait |
+| [READ](harness/rules/READ.md) | Before you say you did not read or check something: how to follow ATLAS and `seek`, the reading bound, and the honest fallback |
 | [COMPACT](harness/rules/COMPACT.md) | Before a compaction and right after one: what to file as records first, what the compaction hooks archive and re-inject |
 | [PROSE](harness/rules/PROSE.md) | Writing anything here (docs, rules, records, comments, replies): the filler words to cut, facts over narration, point at the code |
 | [GROK](harness/rules/GROK.md) | Writing any reply, doc or free-prose slot |

@@ -40,6 +40,7 @@ A plan is one `plan` record (`records/PLAN.closure`) and a `phase` record per st
 ## Enact
 
 1. **Take the next task.** `write next` names the first phase that isn't done and whose `depends` are done; take its first open task.
-2. **Do the work.** If a test or verification list fails, order the fixes by `.agents/harness/rules/TESTS.md`.
-3. **Close it with `write done <task-id>`.** That runs every `check:` and ticks the task only when all pass. A `manual` criterion needs `--confirmed "who checked what"`. Nothing is committed.
-4. **If a task can't be done as written,** file a `question` stating the default you would take, and move to a task that doesn't depend on it.
+2. **Check for a design flag.** If `write next` prints a `design` line for a task that adds a new public type, module, or cross-boundary API, follow `.agents/harness/rules/DESIGN.md` and file a `design` record before editing code.
+3. **Do the work.** If a test or verification list fails, order the fixes by `.agents/harness/rules/TESTS.md`.
+4. **Close it with `write done <task-id>`.** That runs every `check:` and ticks the task only when all pass. A `manual` criterion needs `--confirmed "who checked what"`. Nothing is committed.
+5. **If a task can't be done as written,** file a `question` stating the default you would take, and move to a task that doesn't depend on it.

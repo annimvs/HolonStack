@@ -98,7 +98,8 @@ Populate `.agents/reference/` with authoritative specifications for the project'
 1. **Update `.agents/records/SEMANTICS/semantics-core.closure`:**
    - Replace the stub line in `holds` with the project's packages, targets, verification rule, and core invariants.
    - Add key domain terms to `terms`.
-2. **Add routed domain semantics cards:**
+2. **Tailor `semantics-security.closure` and add domain cards:**
+   - Append the project's own security-sensitive paths (process launch, auth, secrets, parsers, plugins) and language sinks to `.agents/records/SEMANTICS/semantics-security.closure` through `bin/write`.
    - For each major bounded context or subsystem, draft a `semantics` record in `.agents/records/drafts/<area>.closure` (`scope: routed`, with `paths`, `cues`, `holds`, `terms`, `next`) and file it with `.agents/harness/bin/write semantics new .agents/records/drafts/<area>.closure`.
 3. **Add project-specific Bash guards (if needed):**
    - If the project has protected deployment paths, signing rules, or forbidden commands, add a `.json` rule file under `.agents/harness/guards.d/`.
