@@ -1,0 +1,12 @@
+task(c5a252e3) {
+  name: "Add exit code on unknown CLI command"
+  est: 20m
+  done: false
+  depends: []
+  criteria: [
+    criterion(19aa9cfb) {
+      text: "CLI source exists"
+      check: "test -f packages/cli/src/main.ts"
+    },
+  ]
+}

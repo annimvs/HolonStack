@@ -1,0 +1,6 @@
+plan(d1986983) {
+  title: "Harden TaskFlow API and CLI"
+  synopsis: "Add body size limits, structured CLI errors, and export support."
+  abstract: "Phase 1 locks down payload validation in @taskflow/api. Phase 2 adds structured export formatting across @taskflow/core and @taskflow/cli."
+  phases: [f1ae8d1e, b470ccd5]
+}

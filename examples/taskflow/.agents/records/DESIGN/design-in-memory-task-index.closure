@@ -1,0 +1,5 @@
+design(d80e9cfd) {
+  name: "In memory task index"
+  verdict: plain_is_fine
+  reason: "TaskStore holds at most a few thousand tasks in one process. A plain Map keyed by task id gives O(1) add and complete and preserves insertion order for list without a secondary index."
+}

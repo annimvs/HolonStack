@@ -1,0 +1,12 @@
+semantics(6d4db97a) {
+  name: "cli"
+  scope: routed
+  paths: ["packages/cli/"]
+  cues: ["runcommand", "argv", "cli output"]
+  holds: """
+    packages/cli formats plain one-line text for stdout and delegates mutations to TaskStore.
+    CLI commands never import from packages/api.
+    """
+  terms: "runCommand: top-level CLI dispatcher for add, done, and list"
+  next: ".agents/codebase/LIFECYCLE.md: CLI path"
+}

@@ -1,0 +1,29 @@
+phase(b470ccd5) {
+  n: 2
+  name: "Harden API and build export formatter"
+  depends: [f1ae8d1e]
+  tasks: [
+    task(3724773c) {
+      name: "Reject API payloads larger than 64 KB"
+      est: 30m
+      done: false
+      criteria: [
+        criterion(72a2548b) {
+          text: "parsePayload enforces body byte cap"
+          check: "grep -q '65536' packages/api/src/server.ts"
+        },
+      ]
+    },
+    task(c98fe809) {
+      name: "Build JSONL export formatter for CLI"
+      est: 1h
+      done: false
+      criteria: [
+        criterion(de23c28f) {
+          text: "CLI exports tasks as JSONL"
+          check: "grep -q 'export' packages/cli/src/main.ts"
+        },
+      ]
+    },
+  ]
+}
