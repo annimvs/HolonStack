@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3
+
+- Add `Context reinjected` status block rule (`COMPACT.md`), machine-readable stats lines in `session-compact.swift` and `route-semantics.swift` (prepended so 6k truncation never drops them), and append-only `.cache/reinjections.jsonl`
+- Require grok'd prose in compaction instructions (`AGENTS.md`, `pre-compact.swift`)
+- Add `READ.md` rule banning unverified disclaimers and wire into `ATLAS.md`
+- Add security-sink semantics card (`semantics-security.closure`), Pass 6 (`area: security`) in `/holon-audit` + `audit.closure`, design gate step in `/plan-and-enact`, and `/work-queue` skill
+- Add zero-PII `examples/taskflow/` adopted sample repository verified by Step 8 in `scripts/smoke-test.sh`
+- Remove tracked `CLAUDE.md`/`GEMINI.md` symlinks and generate them during `/adopt-holon`
+
 ## 0.2
 
 - Dogfood the harness at the repository root with project-specific maps, semantics cards, and upstream platform references
