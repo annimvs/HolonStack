@@ -407,7 +407,7 @@ func main() -> Int32 {
     }
     if !parts.isEmpty {
         let total = injected.reduce(0) { $0 + $1.chars }
-        parts.append(reinjectedLine(cards: injected, total: total))
+        parts.insert(reinjectedLine(cards: injected, total: total), at: 0)
         appendReinjectionLog(project: project, session: session, agent: agent, cards: injected, total: total)
         reply(bounded(parts), event: event, isGemini: isGemini)
     } else if isGemini {

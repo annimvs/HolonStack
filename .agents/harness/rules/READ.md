@@ -1,6 +1,6 @@
 # READ
 
-> **AGENTS: maintain this file with Haiku or a similar-class model, in grok'd prose.** Style rules: [PROSE](PROSE.md).
+> **AGENTS: maintain this file with Haiku or a similar-class model, in grok'd prose.** Style rules: [QUIET](QUIET.md), [PROSE](PROSE.md).
 
 Read the source before you make a claim. This harness makes reading cheap: [ATLAS](../../ATLAS.md) maps every path to one detail file, and `.agents/harness/bin/seek` returns whole units with line ranges.
 

@@ -39,7 +39,7 @@ Leave out what the code, the docs under `.agents/` or git already record ([remem
 Hook context reaches the model only; the client does not show it to the user. Print one `### Context reinjected` block at the end of your reply on **exactly two triggers**, and on no other reply:
 
 1. **First reply after a compaction restart** (`[context-reinjected kind=compact ...]` is in context).
-2. **A reply after `route-semantics` loads a card not already in context** (`[context-reinjected kind=card ...]` is in context).
+2. **A reply after `route-semantics` loads or refreshes a card** (`[context-reinjected kind=card ...]` is in context, including on a 300 KB regrow).
 
 This block is an explicit exception to [QUIET](QUIET.md) ("reply with only what is essential"): print it only on those two triggers, never when nothing was injected. Read the numbers from the `[context-reinjected ...]` line the hook added (hooks also append the same numbers to `.agents/harness/.cache/reinjections.jsonl`). Sizes are characters shown as `k` (`1k` = 1,000 chars; tokens are roughly `chars / 4`). Omit rows whose size is `0`, and use short names (`core`, `harness`, `pre-compact` instead of file extensions).
 
