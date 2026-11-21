@@ -1,0 +1,6 @@
+question(894ebbec) {
+  name: "Maximum API body size"
+  ask: "Should parsePayload cap request bodies at 64 KB or 1 MB?"
+  context: "Blocks the API hardening task in Phase 2. Default: 64 KB, which fits any single task payload with margin."
+  status: open
+}

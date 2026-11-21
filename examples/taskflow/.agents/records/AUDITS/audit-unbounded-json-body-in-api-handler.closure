@@ -1,0 +1,13 @@
+audit(498a0da4) {
+  name: "Unbounded JSON body in API handler"
+  area: enforcement
+  unit: "packages/api/src/server.ts:9"
+  rule: "input boundary validation"
+  severity: high
+  impact: high
+  effort: low
+  evidence: reproduced
+  repro: "handleCreate(store, hugeJsonString)"
+  fix: "Reject rawBody over 64 KB in parsePayload before calling JSON.parse."
+  status: open
+}

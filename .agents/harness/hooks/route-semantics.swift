@@ -185,6 +185,32 @@ func appendEvent(project: String, entry: [String: Any]) {
     }
 }
 
+/// Appends one JSON line to `.agents/harness/.cache/reinjections.jsonl` for card injections.
+func appendReinjectionLog(
+    project: String, session: String, agent: String, cards: [(name: String, chars: Int, reason: String)], total: Int
+) {
+    let url = URL(fileURLWithPath: project + "/.agents/harness/.cache/reinjections.jsonl")
+    let entry: [String: Any] = [
+        "agent": agent, "at": ISO8601DateFormatter().string(from: Date()),
+        "cards": cards.map { ["chars": $0.chars, "name": $0.name, "reason": $0.reason] },
+        "kind": "card", "session": session, "total_chars": total,
+    ]
+    // an unencodable entry is skipped so the hook still exits 0
+    guard let data = try? JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys]) else { return }
+    var line = data
+    line.append(0x0A)
+    // the cache folder may exist already; a write failure below is ignored
+    try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    if let handle = try? FileHandle(forWritingTo: url) {
+        handle.seekToEndOfFile()
+        handle.write(line)
+        // closing an already-flushed descriptor cannot fail meaningfully
+        try? handle.close()
+    } else {
+        // a failed first write only means this injection is not logged
+        try? line.write(to: url, options: .atomic)
+    }
+}
 // MARK: - State
 /// What this session and agent last saw: the active card, the transcript size when the `always` cards were last
 /// added (below zero after a compaction), and the size at which each card was last added.
@@ -260,6 +286,12 @@ func render(_ c: Card, reason: String) -> String {
     return parts.joined(separator: "\n")
 }
 
+/// Formats the machine-readable status line for the cards injected in this event.
+func reinjectedLine(cards: [(name: String, chars: Int, reason: String)], total: Int) -> String {
+    let summary = cards.map { "\($0.name):\($0.chars)(\($0.reason))" }.joined(separator: "; ")
+    return "[context-reinjected kind=card total=\(total) cards=\(summary)]"
+}
+
 /// Joins the parts and cuts the result at `messageLimit` characters with a note naming the folder.
 func bounded(_ parts: [String]) -> String {
     let text = parts.joined(separator: "\n\n")
@@ -322,7 +354,7 @@ func main() -> Int32 {
         chosen = m.card
         matchedCues = m.cues
         ties = m.ties
-        reason = "matched the prompt"
+        reason = matchedCues.isEmpty ? "matched the prompt" : "matched \(matchedCues.prefix(3).joined(separator: ", "))"
         if chosen != nil { kind = "prompt" }
     } else {
         let toolInput =
@@ -350,10 +382,20 @@ func main() -> Int32 {
     let fresh = active.map { stale(shown[$0.name] ?? -1, at: size) } ?? false
     let canDeliver = !isGemini || event == "PreInvocation"
     var parts: [String] = []
+    var injected: [(name: String, chars: Int, reason: String)] = []
     if canDeliver {
-        if due { parts += cards.filter(\.always).map { render($0, reason: "always present") } }
+        if due {
+            for card in cards.filter(\.always) {
+                let text = render(card, reason: "always present")
+                parts.append(text)
+                injected.append((card.name, text.count, "always present"))
+            }
+        }
         if let active, due || fresh {
-            parts.append(render(active, reason: chosen == nil ? "the active area" : reason))
+            let activeReason = chosen == nil ? "the active area" : reason
+            let text = render(active, reason: activeReason)
+            parts.append(text)
+            injected.append((active.name, text.count, activeReason))
             shown[active.name] = size
             appendEvent(
                 project: project,
@@ -364,6 +406,9 @@ func main() -> Int32 {
         }
     }
     if !parts.isEmpty {
+        let total = injected.reduce(0) { $0 + $1.chars }
+        parts.insert(reinjectedLine(cards: injected, total: total), at: 0)
+        appendReinjectionLog(project: project, session: session, agent: agent, cards: injected, total: total)
         reply(bounded(parts), event: event, isGemini: isGemini)
     } else if isGemini {
         print("{}")

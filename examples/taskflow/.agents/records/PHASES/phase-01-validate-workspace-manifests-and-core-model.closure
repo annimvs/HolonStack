@@ -1,0 +1,18 @@
+phase(f1ae8d1e) {
+  n: 1
+  name: "Validate workspace manifests and core model"
+  depends: []
+  tasks: [
+    task(0cc2df67) {
+      name: "Verify core task module exists"
+      est: 15m
+      done: true
+      criteria: [
+        criterion(1203b975) {
+          text: "TaskStore source file is present"
+          check: "test -f packages/core/src/task.ts"
+        },
+      ]
+    },
+  ]
+}

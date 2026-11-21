@@ -2,7 +2,7 @@
 // One architectural, doc, modularity, logic, enforcement, or language-rule finding from /holon-audit.
 audit(id()) {
   name:     grok("noun phrase, >= 2 words, <= 8 words, no dashes")
-  area:     enum(docs, modularity, patterns, language, lint, logic, enforcement)
+  area:     enum(docs, modularity, patterns, language, lint, logic, enforcement, security)
   unit:     grok("path and line of the code or doc, <= 6 words")
   rule:     grok("rule or doc violated, <= 6 words")
   severity: enum(low, medium, high)

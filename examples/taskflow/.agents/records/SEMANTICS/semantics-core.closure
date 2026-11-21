@@ -1,0 +1,16 @@
+semantics(70ee1db0) {
+  name: "core"
+  scope: always
+  paths: ["packages/core/"]
+  cues: ["taskstore", "task model"]
+  holds: """
+    TaskFlow is a three-package pnpm workspace: @taskflow/core is the choke point; @taskflow/api and @taskflow/cli depend only on core.
+    @taskflow/core never imports from @taskflow/api or @taskflow/cli.
+    Replies are prose; plans, tasks, memories, questions and audits are filed through bin/write.
+    """
+  terms: "choke point: a package depended on by most targets, owned by the orchestrator during parallel work"
+  next: """
+    .agents/ATLAS.md: map of every path under .agents/
+    .agents/codebase/CODEBASE.md: module graph and layering rules
+    """
+}

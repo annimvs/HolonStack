@@ -1,0 +1,20 @@
+semantics(f32c7bef) {
+  name: "security"
+  scope: routed
+  paths: [".agents/harness/guards.d/"]
+  cues: ["security", "path traversal", "command injection", "sql injection", "shell injection", "trust boundary", "dlopen", "keychain", "vault", "codesign", "privilege", "sanitize"]
+  holds: """
+    Untrusted inputs (argv, env, file paths, stdin, IPC, network) are validated before reaching a sink.
+    Subprocess launches pass argument arrays rather than shell-interpolated command strings.
+    File paths from external input are resolved and checked against their allowed root before reading or writing.
+    Guards fail closed on invalid input and never silently bypass a permission check; informational hooks never block and exit 0.
+    """
+  terms: """
+    sink: an API that runs commands, loads code, queries data, touches secrets, or changes files
+    trust boundary: the point where untrusted data enters a privileged or local-execution path
+    """
+  next: """
+    .agents/harness/skills/holon-audit/SKILL.md: running the sink-first security pass
+    .agents/harness/rules/ACCESS.md: what an agent may do without asking
+    """
+}

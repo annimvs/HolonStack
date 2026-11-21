@@ -134,4 +134,13 @@ printf 'add_executable(demo_app main.c)\ntarget_link_libraries(demo_app PRIVATE 
 grep -q "choke (orchestrator owns): core" "$WORK/cmake-graph.out"
 grep -q "demo_app  app  reads core" "$WORK/cmake-graph.out"
 
+echo "==> 8. Verify examples/taskflow against adopt-holon harness"
+EX_DIR="$WORK/example-taskflow"
+mkdir -p "$EX_DIR"
+cp -R "$REPO_ROOT/examples/taskflow/." "$EX_DIR/"
+cp -R "$REPO_ROOT/adopt-holon/.agents/harness" "$EX_DIR/.agents/"
+(cd "$EX_DIR" && CLAUDE_PROJECT_DIR="$EX_DIR" "$WORK/.agents/harness/.cache/bin/write" check)
+(cd "$EX_DIR" && CLAUDE_PROJECT_DIR="$EX_DIR" "$WORK/.agents/harness/.cache/bin/check-docs")
+(cd "$EX_DIR" && CLAUDE_PROJECT_DIR="$EX_DIR" "$WORK/.agents/harness/.cache/bin/isolate" graph) | grep -q "choke (orchestrator owns): @taskflow/core"
+
 echo "==> Smoke test passed."

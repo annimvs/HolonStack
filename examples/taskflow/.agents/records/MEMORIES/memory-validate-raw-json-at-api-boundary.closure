@@ -1,0 +1,6 @@
+memory(24099dbe) {
+  name: "Validate raw JSON at API boundary"
+  description: "parsePayload must reject non-string fields and oversized bodies before TaskStore.add"
+  type: project
+  body: "TaskStore assumes callers pass validated strings. Keep schema and size checks inside packages/api/src/server.ts so core stays small and independent of transport framing."
+}

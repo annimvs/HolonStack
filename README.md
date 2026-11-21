@@ -121,6 +121,10 @@ HolonStack/
 | **Graph isolation (`isolate`)** | SwiftPM (`Package.swift`), Cargo (`Cargo.toml`), npm/yarn/bun (`package.json`), pnpm (`pnpm-workspace.yaml`), Go (`go.mod`), CMake (`CMakeLists.txt`); extensible for Meson, Ninja, Bazel, Gradle, Make during `/adopt-holon` |
 | **Scope-aware search (`seek`)** | Swift, C/C++/ObjC, Rust, Go, JS/TS, Java, Kotlin, C#, Zig, Python, Markdown, `.closure` |
 
+## Sample Adopted Repository
+
+See [examples/taskflow/](examples/taskflow/README.md) for a complete, zero-PII adopted workspace showing filled `ATLAS.md` / `CODEBASE.md` / `maps/`, routed `SEMANTICS/` cards, rendered `AUDIT.md` / `PLAN.md` / `MEMORY.md` / `SEMANTICS.md` views, and real `isolate`, `seek`, `write measure`, and `write next` outputs (verified in `scripts/smoke-test.sh`).
+
 ## License
 
 MIT — see [LICENSE.md](LICENSE.md).

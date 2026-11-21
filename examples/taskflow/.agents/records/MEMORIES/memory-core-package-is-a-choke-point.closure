@@ -1,0 +1,6 @@
+memory(0f058ce2) {
+  name: "Core package is a choke point"
+  description: "Edit @taskflow/core in the orchestrator before spawning parallel api and cli workers"
+  type: project
+  body: "Both @taskflow/api and @taskflow/cli depend on @taskflow/core. Under isolate plan, core is derived as a choke point so api and cli workers can run in parallel without moving core's types underneath them."
+}

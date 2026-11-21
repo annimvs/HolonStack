@@ -1,0 +1,12 @@
+audit(03f66b39) {
+  name: "Duplicate title trimming across layers"
+  area: modularity
+  unit: "packages/core/src/task.ts:11"
+  rule: "PRACTICES.md single responsibility"
+  severity: low
+  impact: medium
+  effort: low
+  evidence: inferred
+  fix: "Keep trimming in TaskStore.add and have API return the normalized title."
+  status: open
+}

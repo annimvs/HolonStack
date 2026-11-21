@@ -1,0 +1,12 @@
+semantics(5e80e383) {
+  name: "api"
+  scope: routed
+  paths: ["packages/api/"]
+  cues: ["payload", "handlecreate", "http", "json body"]
+  holds: """
+    packages/api validates all incoming JSON fields before calling TaskStore.
+    API handlers never import from packages/cli.
+    """
+  terms: "CreatePayload: validated string id and title parsed from raw JSON"
+  next: ".agents/codebase/LIFECYCLE.md: API create path"
+}

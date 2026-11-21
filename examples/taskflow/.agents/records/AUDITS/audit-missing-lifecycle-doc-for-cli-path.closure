@@ -1,0 +1,13 @@
+audit(e9f1bf0c) {
+  name: "Missing lifecycle doc for CLI path"
+  area: docs
+  unit: ".agents/codebase/LIFECYCLE.md:12"
+  rule: "PRACTICES.md navigation map"
+  severity: medium
+  impact: medium
+  effort: low
+  evidence: reproduced
+  repro: "bin/check-docs"
+  fix: "Document CLI add, done, and list flow in LIFECYCLE.md."
+  status: fixed
+}
